@@ -4,18 +4,31 @@ export default async function handler(req, res) {
   }
 
   const { email, password } = req.body || {};
-  const validEmail = process.env.AUTH_EMAIL;
-  const validPassword = process.env.AUTH_PASSWORD;
 
-  if (!validEmail || !validPassword) {
-    return res.status(500).json({ error: 'Auth not configured' });
+  let users;
+  try {
+    users = JSON.parse(process.env.USERS || '[]');
+  } catch (e) {
+    console.error('USERS env parse error:', e.message, 'Raw:', process.env.USERS);
+    return res.status(500).json({ error: 'Server config error', detail: e.message });
   }
 
-  if (email === validEmail && password === validPassword) {
-    // Generate a simple session token
-    const token = Buffer.from(`${email}:${Date.now()}:${process.env.AUTH_SECRET || 'vitru'}`).toString('base64');
-    return res.status(200).json({ token });
+  const user = users.find(u => u.email === email && u.password === password);
+
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid credentials' });
   }
 
-  return res.status(401).json({ error: 'Invalid credentials' });
+  const token = Buffer.from(JSON.stringify({
+    email: user.email,
+    role: user.role || 'viewer',
+    portfolios: user.portfolios || [],
+  })).toString('base64');
+
+  return res.status(200).json({
+    token,
+    role: user.role || 'viewer',
+    portfolios: user.portfolios || [],
+    email: user.email,
+  });
 }

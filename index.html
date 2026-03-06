@@ -923,6 +923,7 @@
         <div class="pulse"></div>
         <span id="statusText">READY</span>
       </div>
+      <button onclick="doLogout()" style="background:none; border:1px solid var(--border); color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:10px; padding:5px 10px; border-radius:6px; cursor:pointer;">Sign Out</button>
     </div>
   </div>
 
@@ -1082,6 +1083,8 @@ let lastFetchTime = null;
 
 let log = [];
 let authToken = null;
+let userRole = 'viewer';
+let userPortfolios = [];
 let currentPortfolioId = 'aggressive';
 let portfolioList = [];
 
@@ -1094,6 +1097,14 @@ window.onload = () => {
     document.querySelector('.app').style.display = 'none';
     return;
   }
+  // Restore role from token
+  try {
+    const tokenData = JSON.parse(atob(authToken));
+    userRole = tokenData.role || 'viewer';
+    userPortfolios = tokenData.portfolios || [];
+    if (userPortfolios.length > 0) currentPortfolioId = userPortfolios[0];
+  } catch (e) {}
+  applyRoleRestrictions();
   document.getElementById('loginOverlay').classList.add('hidden');
   document.querySelector('.app').style.display = 'block';
 
@@ -1493,8 +1504,12 @@ async function doLogin() {
 
     const data = await res.json();
     authToken = data.token;
+    userRole = data.role || 'viewer';
+    userPortfolios = data.portfolios || [];
     localStorage.setItem('vitruAuth', authToken);
+    if (userPortfolios.length > 0) currentPortfolioId = userPortfolios[0];
 
+    applyRoleRestrictions();
     document.getElementById('loginOverlay').classList.add('hidden');
     document.querySelector('.app').style.display = 'block';
 
@@ -1511,20 +1526,42 @@ async function doLogin() {
       updateDashboard();
     }
     renderPortfolio();
-    addLog('Vitru initialized — signed in', 'info');
+    addLog('Vitru initialized — signed in as ' + userRole, 'info');
     loadLatestData();
   } catch (e) {
     errorEl.style.display = 'block';
   }
 }
 
+function doLogout() {
+  authToken = null;
+  userRole = 'viewer';
+  userPortfolios = [];
+  localStorage.removeItem('vitruAuth');
+  document.getElementById('loginOverlay').classList.remove('hidden');
+  document.querySelector('.app').style.display = 'none';
+  document.getElementById('portfolioSelector').innerHTML = '';
+}
+
+function applyRoleRestrictions() {
+  const runBtn = document.getElementById('runBtn');
+  if (userRole === 'viewer') {
+    runBtn.style.display = 'none';
+  } else {
+    runBtn.style.display = '';
+  }
+}
+
 function switchPortfolio(id) {
   currentPortfolioId = id;
   // Clear current display
+  const emptyMsg = userRole === 'viewer'
+    ? 'Analysis runs automatically each morning. Check back soon.'
+    : 'Hit <strong>Run AI Analysis</strong> to analyze this portfolio';
   document.getElementById('analysisBody').innerHTML = `
     <div class="analysis-empty">
       <div class="icon">&#128202;</div>
-      <div>Hit <strong>Run AI Analysis</strong> to analyze this portfolio</div>
+      <div>${emptyMsg}</div>
     </div>`;
   loadLatestData();
 }
@@ -1537,12 +1574,15 @@ async function loadLatestData() {
     if (!res.ok) return;
     const data = await res.json();
 
-    // Populate portfolio selector
+    // Populate portfolio selector (filtered by user access)
     if (data.portfolioList && data.portfolioList.length > 0) {
       portfolioList = data.portfolioList;
       const sel = document.getElementById('portfolioSelector');
       if (sel.options.length === 0) {
-        data.portfolioList.forEach(p => {
+        const accessible = userPortfolios.length > 0
+          ? data.portfolioList.filter(p => userPortfolios.includes(p.id))
+          : data.portfolioList;
+        accessible.forEach(p => {
           const opt = document.createElement('option');
           opt.value = p.id;
           opt.textContent = `${p.name} (+${p.targetAlpha}% alpha)`;

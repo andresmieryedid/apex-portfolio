@@ -3,15 +3,19 @@ import { kv } from '@vercel/kv';
 export default async function handler(req, res) {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  let user;
   try {
-    const decoded = Buffer.from(token, 'base64').toString();
-    const [email] = decoded.split(':');
-    if (email !== process.env.AUTH_EMAIL) return res.status(401).json({ error: 'Unauthorized' });
+    user = JSON.parse(Buffer.from(token, 'base64').toString());
+    if (!user.email) return res.status(401).json({ error: 'Unauthorized' });
   } catch {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  // Check if user has access to this portfolio
   const portfolioId = req.query.id || 'aggressive';
+  if (user.portfolios && user.portfolios.length > 0 && !user.portfolios.includes(portfolioId)) {
+    return res.status(403).json({ error: 'No access to this portfolio' });
+  }
 
   try {
     const keys = await kv.keys(`daily:${portfolioId}:*`);

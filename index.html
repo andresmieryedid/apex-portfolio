@@ -858,6 +858,52 @@
   .price-change.flat { color: var(--muted); }
 
 
+  /* Login screen */
+  .login-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .login-overlay.hidden { display: none; }
+
+  .login-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 40px;
+    width: 360px;
+    max-width: 90%;
+  }
+
+  .login-card .logo {
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  .login-card p {
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 24px;
+  }
+
+  .login-card .field { margin-bottom: 14px; }
+
+  .login-error {
+    color: var(--danger);
+    font-size: 11px;
+    text-align: center;
+    margin-bottom: 12px;
+    display: none;
+  }
+
+  .login-card .btn { width: 100%; justify-content: center; }
+
   /* Scrollbar */
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -995,6 +1041,24 @@
 
 </div>
 
+<!-- Login -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="logo" style="text-align:center;">VITR<span>U</span></div>
+    <p>AI Portfolio Monitor</p>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="you@example.com" />
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="Enter password" onkeydown="if(event.key==='Enter')doLogin()" />
+    </div>
+    <div class="login-error" id="loginError">Invalid email or password</div>
+    <button class="btn btn-primary" onclick="doLogin()">Sign In</button>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -1015,9 +1079,20 @@ let spyData = null;  // same shape for SPY
 let lastFetchTime = null;
 
 let log = [];
+let authToken = null;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 window.onload = () => {
+  // Check auth
+  authToken = localStorage.getItem('vitruAuth');
+  if (!authToken) {
+    document.getElementById('loginOverlay').classList.remove('hidden');
+    document.querySelector('.app').style.display = 'none';
+    return;
+  }
+  document.getElementById('loginOverlay').classList.add('hidden');
+  document.querySelector('.app').style.display = 'block';
+
   updateStatus('READY', true);
 
   const savedPortfolio = localStorage.getItem('vitruPortfolio');
@@ -1034,6 +1109,9 @@ window.onload = () => {
 
   renderPortfolio();
   addLog('Vitru initialized — portfolio loaded', 'info');
+
+  // Auto-load latest analysis from server
+  loadLatestData();
 };
 
 
@@ -1045,7 +1123,7 @@ async function fetchMarketData() {
   try {
     const res = await fetch('/api/analyze', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
       body: JSON.stringify({ portfolio })
     });
 
@@ -1221,7 +1299,7 @@ async function runAnalysis(auto = false) {
   try {
     const res = await fetch('/api/analyze', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
       body: JSON.stringify({ portfolio })
     });
 
@@ -1388,6 +1466,96 @@ async function runAnalysis(auto = false) {
   }
 
   btn.disabled = false;
+}
+
+// ─── Auth ─────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errorEl = document.getElementById('loginError');
+  errorEl.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!res.ok) {
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    const data = await res.json();
+    authToken = data.token;
+    localStorage.setItem('vitruAuth', authToken);
+
+    document.getElementById('loginOverlay').classList.add('hidden');
+    document.querySelector('.app').style.display = 'block';
+
+    // Initialize app
+    updateStatus('READY', true);
+    const savedPortfolio = localStorage.getItem('vitruPortfolio');
+    if (savedPortfolio) portfolio = JSON.parse(savedPortfolio);
+    const savedMarket = localStorage.getItem('vitruMarketData');
+    if (savedMarket) {
+      const parsed = JSON.parse(savedMarket);
+      marketData = parsed.stocks || {};
+      spyData = parsed.spy || null;
+      lastFetchTime = parsed.time || null;
+      updateDashboard();
+    }
+    renderPortfolio();
+    addLog('Vitru initialized — signed in', 'info');
+    loadLatestData();
+  } catch (e) {
+    errorEl.style.display = 'block';
+  }
+}
+
+async function loadLatestData() {
+  try {
+    const res = await fetch('/api/history', {
+      headers: { 'Authorization': 'Bearer ' + authToken },
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+
+    if (data.ytdStats) {
+      updateAlphaTracker({
+        ytdAlpha: data.ytdStats.alpha,
+        targetAlpha: 10,
+        alphaGap: 10 - data.ytdStats.alpha,
+        tradingDaysLeft: 252,
+        onTrack: data.ytdStats.alpha >= 0,
+        ytdPortfolioReturn: data.ytdStats.portfolioReturn,
+        ytdSpyReturn: data.ytdStats.spyReturn,
+      });
+
+      const ytdPEl = document.getElementById('dashPortfolioYtd');
+      if (ytdPEl) {
+        ytdPEl.textContent = `YTD: ${data.ytdStats.portfolioReturn >= 0 ? '+' : ''}${data.ytdStats.portfolioReturn.toFixed(2)}%`;
+        ytdPEl.className = 'dash-sub ' + (data.ytdStats.portfolioReturn >= 0 ? 'green' : 'red');
+      }
+      const ytdSEl = document.getElementById('dashSpyYtd');
+      if (ytdSEl) {
+        ytdSEl.textContent = `YTD: ${data.ytdStats.spyReturn >= 0 ? '+' : ''}${data.ytdStats.spyReturn.toFixed(2)}%`;
+        ytdSEl.className = 'dash-sub ' + (data.ytdStats.spyReturn >= 0 ? 'green' : 'red');
+      }
+    }
+
+    // Load latest snapshot prices into dashboard
+    if (data.snapshots && data.snapshots.length > 0) {
+      const latest = data.snapshots[data.snapshots.length - 1];
+      if (latest.prices?.SPY) {
+        document.getElementById('dashSpyPrice').textContent = '$' + latest.prices.SPY.toFixed(2);
+      }
+      document.getElementById('lastRunTime').textContent = 'Last run: ' + new Date(data.ytdStats?.updatedAt || '').toLocaleString();
+    }
+  } catch (e) {
+    // Silent fail — data will load on next analysis
+  }
 }
 
 // ─── Alpha Tracker ────────────────────────────────────────────────────────

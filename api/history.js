@@ -1,6 +1,20 @@
 import { kv } from '@vercel/kv';
 
 export default async function handler(req, res) {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    const decoded = Buffer.from(token, 'base64').toString();
+    const [email] = decoded.split(':');
+    if (email !== process.env.AUTH_EMAIL) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   try {
     // Get all daily snapshots
     const keys = await kv.keys('daily:*');

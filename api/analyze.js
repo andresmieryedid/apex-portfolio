@@ -4,6 +4,23 @@ export default async function handler(req, res) {
   // Allow both cron (GET) and frontend (POST) triggers
   const isCron = req.method === 'GET';
 
+  // Cron requests are trusted (Vercel internal). POST requests need auth.
+  if (!isCron) {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      const decoded = Buffer.from(token, 'base64').toString();
+      const [email] = decoded.split(':');
+      if (email !== process.env.AUTH_EMAIL) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+    } catch {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+  }
+
   // Portfolio: use POST body if provided, otherwise fall back to env var
   let portfolio;
   if (!isCron && req.body?.portfolio) {

@@ -5,30 +5,23 @@ export default async function handler(req, res) {
 
   const { email, password } = req.body || {};
 
-  let users;
-  try {
-    users = JSON.parse(process.env.USERS || '[]');
-  } catch (e) {
-    console.error('USERS env parse error:', e.message, 'Raw:', process.env.USERS);
-    return res.status(500).json({ error: 'Server config error', detail: e.message });
-  }
+  const AUTH_EMAIL = process.env.AUTH_EMAIL;
+  const AUTH_PASSWORD = process.env.AUTH_PASSWORD;
 
-  const user = users.find(u => u.email === email && u.password === password);
-
-  if (!user) {
+  if (email !== AUTH_EMAIL || password !== AUTH_PASSWORD) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
   const token = Buffer.from(JSON.stringify({
-    email: user.email,
-    role: user.role || 'viewer',
-    portfolios: user.portfolios || [],
+    email,
+    role: 'admin',
+    portfolios: [],
   })).toString('base64');
 
   return res.status(200).json({
     token,
-    role: user.role || 'viewer',
-    portfolios: user.portfolios || [],
-    email: user.email,
+    role: 'admin',
+    portfolios: [],
+    email,
   });
 }

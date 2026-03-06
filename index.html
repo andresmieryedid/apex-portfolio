@@ -917,9 +917,11 @@
   <div class="header">
     <div class="logo">VITR<span>U</span></div>
     <div style="display:flex; gap:16px; align-items:center;">
+      <select id="portfolioSelector" onchange="switchPortfolio(this.value)" style="background:var(--surface2); border:1px solid var(--border); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:11px; padding:6px 12px; border-radius:8px; cursor:pointer;">
+      </select>
       <div class="status-pill" id="statusPill">
         <div class="pulse"></div>
-        <span id="statusText">SETUP REQUIRED</span>
+        <span id="statusText">READY</span>
       </div>
     </div>
   </div>
@@ -1080,6 +1082,8 @@ let lastFetchTime = null;
 
 let log = [];
 let authToken = null;
+let currentPortfolioId = 'aggressive';
+let portfolioList = [];
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 window.onload = () => {
@@ -1124,7 +1128,7 @@ async function fetchMarketData() {
     const res = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-      body: JSON.stringify({ portfolio })
+      body: JSON.stringify({ portfolioId: currentPortfolioId })
     });
 
     if (!res.ok) {
@@ -1300,7 +1304,7 @@ async function runAnalysis(auto = false) {
     const res = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-      body: JSON.stringify({ portfolio })
+      body: JSON.stringify({ portfolioId: currentPortfolioId })
     });
 
     if (!res.ok) {
@@ -1514,13 +1518,39 @@ async function doLogin() {
   }
 }
 
+function switchPortfolio(id) {
+  currentPortfolioId = id;
+  // Clear current display
+  document.getElementById('analysisBody').innerHTML = `
+    <div class="analysis-empty">
+      <div class="icon">&#128202;</div>
+      <div>Hit <strong>Run AI Analysis</strong> to analyze this portfolio</div>
+    </div>`;
+  loadLatestData();
+}
+
 async function loadLatestData() {
   try {
-    const res = await fetch('/api/history', {
+    const res = await fetch('/api/history?id=' + currentPortfolioId, {
       headers: { 'Authorization': 'Bearer ' + authToken },
     });
     if (!res.ok) return;
     const data = await res.json();
+
+    // Populate portfolio selector
+    if (data.portfolioList && data.portfolioList.length > 0) {
+      portfolioList = data.portfolioList;
+      const sel = document.getElementById('portfolioSelector');
+      if (sel.options.length === 0) {
+        data.portfolioList.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = `${p.name} (+${p.targetAlpha}% alpha)`;
+          sel.appendChild(opt);
+        });
+        sel.value = currentPortfolioId;
+      }
+    }
 
     if (data.ytdStats) {
       updateAlphaTracker({

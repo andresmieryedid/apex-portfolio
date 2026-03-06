@@ -2,23 +2,20 @@ import { kv } from '@vercel/kv';
 
 export default async function handler(req, res) {
   const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
   try {
     const decoded = Buffer.from(token, 'base64').toString();
     const [email] = decoded.split(':');
-    if (email !== process.env.AUTH_EMAIL) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+    if (email !== process.env.AUTH_EMAIL) return res.status(401).json({ error: 'Unauthorized' });
   } catch {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  const portfolioId = req.query.id || 'aggressive';
+
   try {
-    // Get all daily snapshots
-    const keys = await kv.keys('daily:*');
-    keys.sort(); // chronological order
+    const keys = await kv.keys(`daily:${portfolioId}:*`);
+    keys.sort();
 
     const snapshots = [];
     for (const key of keys) {
@@ -26,13 +23,16 @@ export default async function handler(req, res) {
       if (data) snapshots.push(data);
     }
 
-    // Get initial prices
-    const initPrices = await kv.get('init:prices');
+    const initPrices = await kv.get(`init:prices:${portfolioId}`);
+    const ytdStats = await kv.get(`ytd:latest:${portfolioId}`);
 
-    // Get latest YTD stats
-    const ytdStats = await kv.get('ytd:latest');
+    // Also return list of available portfolios
+    const allPortfolios = JSON.parse(process.env.PORTFOLIOS || '[]');
+    const portfolioList = allPortfolios.map(p => ({ id: p.id, name: p.name, strategy: p.strategy, targetAlpha: p.targetAlpha }));
 
     return res.status(200).json({
+      portfolioId,
+      portfolioList,
       snapshots,
       initPrices,
       ytdStats,

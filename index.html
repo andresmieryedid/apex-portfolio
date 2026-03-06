@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>APEX — AI Portfolio Monitor</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.emailjs.com/dist/email.min.js"></script>
 <style>
   :root {
     --bg: #080a0e;
@@ -617,21 +616,6 @@
   .price-change.down { color: var(--danger); }
   .price-change.flat { color: var(--muted); }
 
-  /* Collapsible setup */
-  .setup-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    cursor: pointer;
-    user-select: none;
-  }
-  .setup-toggle .chevron {
-    font-size: 14px;
-    color: var(--muted);
-    transition: transform 0.2s;
-  }
-  .setup-card.collapsed .setup-content { display: none; }
-  .setup-card.collapsed .chevron { transform: rotate(-90deg); }
 
   /* Scrollbar */
   ::-webkit-scrollbar { width: 6px; }
@@ -656,51 +640,6 @@
     </div>
   </div>
 
-  <!-- API Keys Setup -->
-  <div class="setup-card" id="setupCard">
-    <div class="setup-toggle" onclick="toggleSetup()">
-      <div>
-        <div class="section-label">Configuration</div>
-        <h2>API Keys & Email Setup</h2>
-      </div>
-      <span class="chevron">&#9660;</span>
-    </div>
-    <div class="setup-content">
-      <p>Email alerts are optional. API keys are configured server-side in Vercel environment variables. The AI runs automatically every market open.</p>
-
-      <div class="setup-grid">
-        <div class="field">
-          <label>Your Email Address</label>
-          <input type="email" id="userEmail" placeholder="you@example.com" />
-        </div>
-        <div class="field">
-          <label>EmailJS Service ID</label>
-          <input type="text" id="ejsService" placeholder="service_xxxxxxx" />
-        </div>
-        <div class="field">
-          <label>EmailJS Template ID</label>
-          <input type="text" id="ejsTemplate" placeholder="template_xxxxxxx" />
-        </div>
-        <div class="field">
-          <label>EmailJS Public Key</label>
-          <input type="text" id="ejsPublicKey" placeholder="your_public_key" />
-        </div>
-      </div>
-
-      <div class="setup-note">
-        <strong>Email setup (optional):</strong><br>
-        1. Create a free account at <a href="https://www.emailjs.com" target="_blank">emailjs.com</a><br>
-        2. Add an Email Service (Gmail, Outlook, etc.) and copy the <strong>Service ID</strong><br>
-        3. Create a Template with <code>{{to_email}}</code>, <code>{{subject}}</code>, <code>{{message}}</code> and copy the <strong>Template ID</strong><br>
-        4. Go to Account > API Keys and copy your <strong>Public Key</strong>
-      </div>
-
-      <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
-        <button class="btn btn-primary" onclick="saveConfig()">Save Configuration</button>
-        <button class="btn btn-secondary" onclick="testEmail()">Send Test Email</button>
-      </div>
-    </div>
-  </div>
 
   <!-- Dashboard -->
   <div class="dashboard" id="dashboard">
@@ -841,12 +780,6 @@ let portfolio = [
   { ticker: 'PYPL', company: 'PayPal',             amount: 400  },
 ];
 
-let config = {
-  email: '',
-  ejsServiceId: '',
-  ejsTemplateId: '',
-  ejsPublicKey: '',
-};
 
 let marketData = {}; // { TICKER: { price, change, changePct, high, low, volume, prevClose } }
 let spyData = null;  // same shape for SPY
@@ -858,17 +791,7 @@ let log = [];
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 window.onload = () => {
-  const savedConfig = localStorage.getItem('apexConfig');
-  if (savedConfig) {
-    config = JSON.parse(savedConfig);
-    document.getElementById('userEmail').value = config.email || '';
-    document.getElementById('ejsService').value = config.ejsServiceId || '';
-    document.getElementById('ejsTemplate').value = config.ejsTemplateId || '';
-    document.getElementById('ejsPublicKey').value = config.ejsPublicKey || '';
-    if (config.ejsPublicKey) emailjs.init(config.ejsPublicKey);
-    updateStatus('READY', true);
-    document.getElementById('setupCard').classList.add('collapsed');
-  }
+  updateStatus('READY', true);
 
   const savedPortfolio = localStorage.getItem('apexPortfolio');
   if (savedPortfolio) portfolio = JSON.parse(savedPortfolio);
@@ -886,24 +809,6 @@ window.onload = () => {
   addLog('APEX initialized — portfolio loaded', 'info');
 };
 
-// ─── Config ───────────────────────────────────────────────────────────────────
-function saveConfig() {
-  config = {
-    email:         document.getElementById('userEmail').value.trim(),
-    ejsServiceId:  document.getElementById('ejsService').value.trim(),
-    ejsTemplateId: document.getElementById('ejsTemplate').value.trim(),
-    ejsPublicKey:  document.getElementById('ejsPublicKey').value.trim(),
-  };
-  if (config.ejsPublicKey) emailjs.init(config.ejsPublicKey);
-  localStorage.setItem('apexConfig', JSON.stringify(config));
-  updateStatus('READY', true);
-  addLog('Configuration saved', 'ok');
-  showToast('Configuration saved!', 'success');
-}
-
-function toggleSetup() {
-  document.getElementById('setupCard').classList.toggle('collapsed');
-}
 
 // ─── Market Data (via serverless API) ─────────────────────────────────────────
 async function fetchMarketData() {
@@ -1173,63 +1078,6 @@ async function runAnalysis(auto = false) {
   }
 
   btn.disabled = false;
-}
-
-async function sendAlertEmail(analysisText, verdict) {
-  if (!config.ejsPublicKey || !config.ejsServiceId || !config.ejsTemplateId || !config.email) return;
-  try {
-    const total = portfolio.reduce((s, x) => s + x.amount, 0);
-    const subject = verdict === 'ACTION REQUIRED'
-      ? 'APEX ALERT — Portfolio Action Required'
-      : 'APEX Daily Check — Portfolio Holding Steady';
-
-    let benchLine = '';
-    if (spyData) {
-      benchLine = `\nSPY: $${spyData.price.toFixed(2)} (${spyData.changePct >= 0 ? '+' : ''}${spyData.changePct.toFixed(2)}%)`;
-    }
-
-    const message = `APEX PORTFOLIO MONITOR — ${new Date().toLocaleDateString()}
-Verdict: ${verdict}
-
-PORTFOLIO: $${total.toLocaleString()}
-${portfolio.map(s => {
-  const q = marketData[s.ticker];
-  return `${s.ticker}: $${s.amount}${q ? ` (price: $${q.price.toFixed(2)}, ${q.changePct >= 0 ? '+' : ''}${q.changePct.toFixed(2)}%)` : ''}`;
-}).join('\n')}${benchLine}
-
-AI ANALYSIS:
-${analysisText}
-
----
-Generated by APEX AI Portfolio Monitor`;
-
-    await emailjs.send(config.ejsServiceId, config.ejsTemplateId, {
-      to_email: config.email,
-      subject,
-      message
-    });
-    addLog(`Email alert sent — ${verdict}`, 'ok');
-    showToast('Alert emailed to ' + config.email, 'success');
-  } catch(e) {
-    addLog('Email send failed: ' + (e.text || e.message), 'alert');
-  }
-}
-
-async function testEmail() {
-  if (!config.ejsPublicKey) { showToast('Save your configuration first', 'error'); return; }
-  showToast('Sending test email...');
-  try {
-    await emailjs.send(config.ejsServiceId, config.ejsTemplateId, {
-      to_email: config.email,
-      subject: 'APEX — Connection Test',
-      message: `Your APEX Portfolio Monitor is connected.\n\nPortfolio: ${portfolio.map(s => s.ticker).join(', ')}\nTotal: $${portfolio.reduce((s,x) => s + x.amount, 0).toLocaleString()}\n\nYou'll receive AI alerts with live market data.`
-    });
-    showToast('Test email sent! Check your inbox.', 'success');
-    addLog(`Test email sent to ${config.email}`, 'ok');
-  } catch(e) {
-    showToast('Email failed — check your IDs/key', 'error');
-    addLog('Test email failed: ' + (e.text || e.message), 'alert');
-  }
 }
 
 // ─── Scheduler ────────────────────────────────────────────────────────────────

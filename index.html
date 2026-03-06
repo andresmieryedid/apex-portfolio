@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APEX — AI Portfolio Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.emailjs.com/dist/email.min.js"></script>
+<style>
+  :root {
+    --bg: #080a0e;
+    --surface: #0d1117;
+    --surface2: #131920;
+    --border: #1e2a35;
+    --accent: #00e5a0;
+    --accent2: #0099ff;
+    --danger: #ff4560;
+    --warn: #f5a623;
+    --text: #e8edf2;
+    --muted: #4a6070;
+    --muted2: #2a3a47;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,160,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,160,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--accent); }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,229,160,0.07);
+    border: 1px solid rgba(0,229,160,0.2);
+    border-radius: 100px;
+    padding: 6px 14px;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+  }
+
+  .pulse {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  .section-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  /* Setup card */
+  .setup-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+
+  .setup-card h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .setup-card p {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+
+  .setup-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  @media (max-width: 600px) { .setup-grid { grid-template-columns: 1fr; } }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field.full { grid-column: 1 / -1; }
+
+  label {
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  input, select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+
+  input:focus, select:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--muted); }
+
+  select option { background: var(--surface2); }
+
+  .setup-note {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: rgba(0,153,255,0.06);
+    border: 1px solid rgba(0,153,255,0.15);
+    border-radius: 8px;
+    font-size: 11px;
+    color: #6ab8ff;
+    line-height: 1.7;
+  }
+  .setup-note a { color: var(--accent2); }
+
+  /* Dashboard cards */
+  .dashboard {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 700px) { .dashboard { grid-template-columns: repeat(2, 1fr); } }
+
+  .dash-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+
+  .dash-label {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .dash-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1.2;
+  }
+
+  .dash-sub {
+    font-size: 11px;
+    margin-top: 4px;
+    color: var(--muted);
+  }
+
+  .green { color: var(--accent); }
+  .red { color: var(--danger); }
+  .blue { color: var(--accent2); }
+
+  /* Portfolio table */
+  .portfolio-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+
+  .portfolio-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .portfolio-header h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .total-badge {
+    font-size: 12px;
+    color: var(--accent);
+    background: rgba(0,229,160,0.08);
+    border: 1px solid rgba(0,229,160,0.15);
+    border-radius: 6px;
+    padding: 4px 10px;
+  }
+
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    padding: 10px 16px;
+    text-align: left;
+    background: rgba(0,0,0,0.2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    padding: 12px 16px;
+    font-size: 12px;
+    border-bottom: 1px solid rgba(30,42,53,0.5);
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .ticker-badge {
+    display: inline-block;
+    background: rgba(0,229,160,0.1);
+    color: var(--accent);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+  }
+
+  .allocation-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .bar-track {
+    flex: 1;
+    height: 4px;
+    background: var(--muted2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px;
+    transition: width 0.4s ease;
+  }
+
+  .alloc-pct { font-size: 11px; color: var(--muted); min-width: 36px; }
+
+  .inline-input {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    padding: 2px 4px;
+    width: 90px;
+    font-size: 12px;
+    color: var(--text);
+  }
+  .inline-input:focus { border-bottom-color: var(--accent); outline: none; }
+
+  .remove-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    line-height: 1;
+  }
+  .remove-btn:hover { color: var(--danger); background: rgba(255,69,96,0.1); }
+
+  .add-row {
+    display: flex;
+    gap: 10px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .add-row input { max-width: 120px; }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    letter-spacing: 0.3px;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+  }
+  .btn-primary:hover { background: #00ffb3; transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-danger {
+    background: rgba(255,69,96,0.1);
+    color: var(--danger);
+    border: 1px solid rgba(255,69,96,0.2);
+  }
+  .btn-danger:hover { background: rgba(255,69,96,0.2); }
+
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+
+  .action-bar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .spacer { flex: 1; }
+
+  /* Analysis panel */
+  .analysis-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+
+  .analysis-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .analysis-header h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .analysis-body {
+    padding: 24px;
+    min-height: 120px;
+  }
+
+  .analysis-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+    color: var(--muted);
+    font-size: 12px;
+    gap: 8px;
+    text-align: center;
+  }
+
+  .analysis-empty .icon { font-size: 32px; opacity: 0.4; }
+
+  .analysis-loading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--accent);
+    font-size: 12px;
+  }
+
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid rgba(0,229,160,0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .analysis-result { font-size: 13px; line-height: 1.8; color: var(--text); }
+
+  .alert-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+
+  .alert-box.action {
+    background: rgba(255,69,96,0.07);
+    border: 1px solid rgba(255,69,96,0.2);
+    color: #ff8fa0;
+  }
+
+  .alert-box.hold {
+    background: rgba(0,229,160,0.06);
+    border: 1px solid rgba(0,229,160,0.15);
+    color: #6effcc;
+  }
+
+  .alert-box.watch {
+    background: rgba(245,166,35,0.07);
+    border: 1px solid rgba(245,166,35,0.2);
+    color: #ffc96a;
+  }
+
+  .alert-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Log */
+  .log-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .log-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .log-header h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .log-body { padding: 16px 24px; max-height: 220px; overflow-y: auto; }
+
+  .log-entry {
+    display: flex;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(30,42,53,0.4);
+    font-size: 11px;
+    line-height: 1.5;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+  .log-entry:last-child { border-bottom: none; }
+  .log-time { color: var(--muted); min-width: 80px; }
+  .log-msg { color: var(--text); flex: 1; }
+  .log-type { font-size: 9px; letter-spacing: 1px; padding: 2px 6px; border-radius: 3px; align-self: flex-start; }
+  .log-type.info { background: rgba(0,153,255,0.12); color: #6ab8ff; }
+  .log-type.alert { background: rgba(255,69,96,0.12); color: var(--danger); }
+  .log-type.ok { background: rgba(0,229,160,0.1); color: var(--accent); }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 20px;
+    font-size: 12px;
+    max-width: 320px;
+    z-index: 999;
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-color: rgba(0,229,160,0.3); }
+  .toast.error { border-color: rgba(255,69,96,0.3); }
+
+  .next-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .next-check strong { color: var(--accent2); }
+
+  /* Modal overlay */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 480px;
+    width: 90%;
+    animation: modalIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes modalIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  .modal h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+  .modal p { font-size: 12px; color: var(--muted); line-height: 1.7; margin-bottom: 20px; }
+
+  .modal-steps { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+  .step {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .step-num {
+    min-width: 24px; height: 24px;
+    background: rgba(0,229,160,0.1);
+    color: var(--accent);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 600;
+  }
+  .step-text { color: var(--muted); }
+  .step-text strong { color: var(--text); }
+  .step-text a { color: var(--accent); text-decoration: none; }
+
+  .modal-fields { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* Price change styling */
+  .price-change {
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .price-change.up { color: var(--accent); }
+  .price-change.down { color: var(--danger); }
+  .price-change.flat { color: var(--muted); }
+
+  /* Collapsible setup */
+  .setup-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+  }
+  .setup-toggle .chevron {
+    font-size: 14px;
+    color: var(--muted);
+    transition: transform 0.2s;
+  }
+  .setup-card.collapsed .setup-content { display: none; }
+  .setup-card.collapsed .chevron { transform: rotate(-90deg); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--muted2); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">APE<span>X</span></div>
+    <div style="display:flex; gap:16px; align-items:center;">
+      <div class="next-check" id="nextCheckDisplay" style="display:none;">
+        Next check: <strong id="nextCheckTimer">--</strong>
+      </div>
+      <div class="status-pill" id="statusPill">
+        <div class="pulse"></div>
+        <span id="statusText">SETUP REQUIRED</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- API Keys Setup -->
+  <div class="setup-card" id="setupCard">
+    <div class="setup-toggle" onclick="toggleSetup()">
+      <div>
+        <div class="section-label">Configuration</div>
+        <h2>API Keys & Email Setup</h2>
+      </div>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="setup-content">
+      <p>APEX needs two API keys: <strong>Alpha Vantage</strong> for live market data (free, 25 calls/day) and <strong>Anthropic</strong> for AI analysis. Email alerts via EmailJS are optional.</p>
+
+      <div class="setup-grid">
+        <div class="field full">
+          <label>Anthropic API Key</label>
+          <input type="password" id="anthropicKey" placeholder="sk-ant-..." />
+        </div>
+        <div class="field full">
+          <label>Alpha Vantage API Key (free at alphavantage.co)</label>
+          <input type="text" id="avKey" placeholder="your_alphavantage_key" />
+        </div>
+        <div class="field">
+          <label>Your Email Address</label>
+          <input type="email" id="userEmail" placeholder="you@example.com" />
+        </div>
+        <div class="field">
+          <label>EmailJS Service ID</label>
+          <input type="text" id="ejsService" placeholder="service_xxxxxxx" />
+        </div>
+        <div class="field">
+          <label>EmailJS Template ID</label>
+          <input type="text" id="ejsTemplate" placeholder="template_xxxxxxx" />
+        </div>
+        <div class="field">
+          <label>EmailJS Public Key</label>
+          <input type="text" id="ejsPublicKey" placeholder="your_public_key" />
+        </div>
+      </div>
+
+      <div class="setup-note">
+        <strong>Quick start:</strong><br>
+        1. Get a free Alpha Vantage key at <a href="https://www.alphavantage.co/support/#api-key" target="_blank">alphavantage.co/support</a> (instant, no credit card)<br>
+        2. Get your Anthropic key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a><br>
+        3. (Optional) Set up <a href="https://www.emailjs.com" target="_blank">EmailJS</a> for email alerts
+      </div>
+
+      <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="saveConfig()">Save Configuration</button>
+        <button class="btn btn-secondary" onclick="testEmail()">Send Test Email</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="dashboard" id="dashboard">
+    <div class="dash-card">
+      <div class="dash-label">Portfolio Value</div>
+      <div class="dash-value" id="dashPortfolioValue">$5,000</div>
+      <div class="dash-sub" id="dashPortfolioChange">--</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-label">S&P 500 (SPY)</div>
+      <div class="dash-value" id="dashSpyPrice">--</div>
+      <div class="dash-sub" id="dashSpyChange">--</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-label">Your Alpha</div>
+      <div class="dash-value" id="dashAlpha">--</div>
+      <div class="dash-sub">vs S&P 500 today</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-label">Market Data</div>
+      <div class="dash-value" id="dashDataStatus" style="font-size:14px;">No data yet</div>
+      <div class="dash-sub" id="dashDataTime">--</div>
+    </div>
+  </div>
+
+  <!-- Portfolio -->
+  <div class="portfolio-card">
+    <div class="portfolio-header">
+      <div>
+        <div class="section-label">Portfolio</div>
+        <h2>Your Holdings</h2>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <button class="btn btn-secondary" onclick="fetchMarketData()" style="padding:6px 12px; font-size:11px;">Refresh Prices</button>
+        <div class="total-badge" id="totalBadge">$5,000.00 invested</div>
+      </div>
+    </div>
+
+    <table id="portfolioTable">
+      <thead>
+        <tr>
+          <th>Ticker</th>
+          <th>Company</th>
+          <th>Invested</th>
+          <th>Price</th>
+          <th>Today</th>
+          <th>Allocation</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="portfolioBody"></tbody>
+    </table>
+
+    <div class="add-row">
+      <input type="text" id="newTicker" placeholder="TICKER" style="max-width:90px; text-transform:uppercase;" />
+      <input type="text" id="newCompany" placeholder="Company name" style="max-width:180px;" />
+      <input type="number" id="newAmount" placeholder="$ Amount" style="max-width:120px;" />
+      <button class="btn btn-secondary" onclick="addStock()">+ Add Stock</button>
+    </div>
+  </div>
+
+  <!-- Action bar -->
+  <div class="action-bar">
+    <button class="btn btn-primary" id="runBtn" onclick="runAnalysis()">
+      Run AI Analysis
+    </button>
+    <button class="btn btn-secondary" id="scheduleBtn" onclick="toggleScheduler()">
+      Start Auto-Monitor
+    </button>
+    <div class="spacer"></div>
+    <button class="btn btn-danger" onclick="clearLog()">Clear Log</button>
+  </div>
+
+  <!-- Analysis Panel -->
+  <div class="analysis-panel">
+    <div class="analysis-header">
+      <div>
+        <div class="section-label">AI Analysis</div>
+        <h2>Portfolio Intelligence</h2>
+      </div>
+      <div id="lastRunTime" style="font-size:11px; color:var(--muted);">Never run</div>
+    </div>
+    <div class="analysis-body" id="analysisBody">
+      <div class="analysis-empty">
+        <div class="icon">&#128202;</div>
+        <div>Hit <strong>Run AI Analysis</strong> to get your first data-driven portfolio review</div>
+        <div style="font-size:10px; color:var(--muted); margin-top:4px;">Claude will analyze live market data for your holdings vs the S&P 500</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Activity Log -->
+  <div class="log-panel">
+    <div class="log-header">
+      <h2>Activity Log</h2>
+      <span style="font-size:10px; color:var(--muted);" id="logCount">0 entries</span>
+    </div>
+    <div class="log-body" id="logBody">
+      <div style="color:var(--muted); font-size:11px; text-align:center; padding:20px;">No activity yet</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+let portfolio = [
+  { ticker: 'MU',   company: 'Micron Technology', amount: 1100 },
+  { ticker: 'AVGO', company: 'Broadcom',          amount: 1000 },
+  { ticker: 'NBIS', company: 'Nebius Group',       amount: 900  },
+  { ticker: 'AMZN', company: 'Amazon',             amount: 1000 },
+  { ticker: 'TTD',  company: 'The Trade Desk',     amount: 600  },
+  { ticker: 'PYPL', company: 'PayPal',             amount: 400  },
+];
+
+let config = {
+  anthropicKey: '',
+  avKey: '',
+  email: '',
+  ejsServiceId: '',
+  ejsTemplateId: '',
+  ejsPublicKey: '',
+};
+
+let marketData = {}; // { TICKER: { price, change, changePct, high, low, volume, prevClose } }
+let spyData = null;  // same shape for SPY
+let lastFetchTime = null;
+
+let schedulerInterval = null;
+let schedulerActive = false;
+let log = [];
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+window.onload = () => {
+  const savedConfig = localStorage.getItem('apexConfig');
+  if (savedConfig) {
+    config = JSON.parse(savedConfig);
+    document.getElementById('anthropicKey').value = config.anthropicKey || '';
+    document.getElementById('avKey').value = config.avKey || '';
+    document.getElementById('userEmail').value = config.email || '';
+    document.getElementById('ejsService').value = config.ejsServiceId || '';
+    document.getElementById('ejsTemplate').value = config.ejsTemplateId || '';
+    document.getElementById('ejsPublicKey').value = config.ejsPublicKey || '';
+    if (config.ejsPublicKey) emailjs.init(config.ejsPublicKey);
+    if (config.anthropicKey && config.avKey) {
+      updateStatus('READY', true);
+      // Collapse setup if configured
+      document.getElementById('setupCard').classList.add('collapsed');
+    }
+  }
+
+  const savedPortfolio = localStorage.getItem('apexPortfolio');
+  if (savedPortfolio) portfolio = JSON.parse(savedPortfolio);
+
+  const savedMarket = localStorage.getItem('apexMarketData');
+  if (savedMarket) {
+    const parsed = JSON.parse(savedMarket);
+    marketData = parsed.stocks || {};
+    spyData = parsed.spy || null;
+    lastFetchTime = parsed.time || null;
+    updateDashboard();
+  }
+
+  renderPortfolio();
+  addLog('APEX initialized — portfolio loaded', 'info');
+};
+
+// ─── Config ───────────────────────────────────────────────────────────────────
+function saveConfig() {
+  config = {
+    anthropicKey:  document.getElementById('anthropicKey').value.trim(),
+    avKey:         document.getElementById('avKey').value.trim(),
+    email:         document.getElementById('userEmail').value.trim(),
+    ejsServiceId:  document.getElementById('ejsService').value.trim(),
+    ejsTemplateId: document.getElementById('ejsTemplate').value.trim(),
+    ejsPublicKey:  document.getElementById('ejsPublicKey').value.trim(),
+  };
+  if (!config.anthropicKey || !config.avKey) {
+    showToast('Anthropic + Alpha Vantage keys are required', 'error');
+    return;
+  }
+  if (config.ejsPublicKey) emailjs.init(config.ejsPublicKey);
+  localStorage.setItem('apexConfig', JSON.stringify(config));
+  updateStatus('READY', true);
+  addLog('Configuration saved', 'ok');
+  showToast('Configuration saved!', 'success');
+}
+
+function toggleSetup() {
+  document.getElementById('setupCard').classList.toggle('collapsed');
+}
+
+// ─── Market Data (Alpha Vantage) ──────────────────────────────────────────────
+async function fetchQuote(symbol) {
+  const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${config.avKey}`;
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (data['Note'] || data['Information']) {
+    throw new Error('Alpha Vantage rate limit hit. Wait 1 minute or upgrade your key.');
+  }
+
+  const q = data['Global Quote'];
+  if (!q || !q['05. price']) {
+    throw new Error(`No quote data for ${symbol}`);
+  }
+
+  return {
+    symbol: q['01. symbol'],
+    price: parseFloat(q['05. price']),
+    change: parseFloat(q['09. change']),
+    changePct: parseFloat(q['10. change percent']?.replace('%', '') || 0),
+    high: parseFloat(q['03. high']),
+    low: parseFloat(q['04. low']),
+    volume: parseInt(q['06. volume']),
+    prevClose: parseFloat(q['08. previous close']),
+  };
+}
+
+async function fetchMarketData() {
+  if (!config.avKey) {
+    showToast('Add your Alpha Vantage API key first', 'error');
+    return;
+  }
+
+  addLog('Fetching live market data...', 'info');
+  showToast('Fetching market data...');
+
+  const tickers = [...new Set(portfolio.map(s => s.ticker))];
+  const allSymbols = [...tickers, 'SPY'];
+
+  let fetched = 0;
+  let errors = [];
+
+  // Fetch sequentially to respect 5/min rate limit
+  for (const symbol of allSymbols) {
+    try {
+      const quote = await fetchQuote(symbol);
+      if (symbol === 'SPY') {
+        spyData = quote;
+      } else {
+        marketData[symbol] = quote;
+      }
+      fetched++;
+      addLog(`${symbol}: $${quote.price.toFixed(2)} (${quote.changePct >= 0 ? '+' : ''}${quote.changePct.toFixed(2)}%)`, 'ok');
+    } catch (e) {
+      errors.push(symbol);
+      addLog(`Failed to fetch ${symbol}: ${e.message}`, 'alert');
+    }
+
+    // Small delay to avoid hitting rate limit (5 calls/min on free tier)
+    if (allSymbols.indexOf(symbol) < allSymbols.length - 1) {
+      await new Promise(r => setTimeout(r, 1500));
+    }
+  }
+
+  lastFetchTime = new Date().toISOString();
+
+  // Cache market data
+  localStorage.setItem('apexMarketData', JSON.stringify({
+    stocks: marketData,
+    spy: spyData,
+    time: lastFetchTime,
+  }));
+
+  updateDashboard();
+  renderPortfolio();
+
+  if (errors.length > 0) {
+    showToast(`Fetched ${fetched}/${allSymbols.length} quotes (${errors.join(', ')} failed)`, 'error');
+  } else {
+    showToast(`All ${fetched} quotes updated!`, 'success');
+  }
+}
+
+function updateDashboard() {
+  // Portfolio value change today (weighted by allocation)
+  const total = portfolio.reduce((s, x) => s + x.amount, 0);
+  let portfolioChangePct = 0;
+  let hasData = false;
+
+  portfolio.forEach(s => {
+    const quote = marketData[s.ticker];
+    if (quote) {
+      hasData = true;
+      const weight = s.amount / total;
+      portfolioChangePct += weight * quote.changePct;
+    }
+  });
+
+  const portfolioChangeAbs = total * (portfolioChangePct / 100);
+
+  document.getElementById('dashPortfolioValue').textContent =
+    '$' + total.toLocaleString('en-US', { minimumFractionDigits: 0 });
+
+  if (hasData) {
+    const el = document.getElementById('dashPortfolioChange');
+    el.textContent = `${portfolioChangePct >= 0 ? '+' : ''}${portfolioChangePct.toFixed(2)}% ($${portfolioChangeAbs >= 0 ? '+' : ''}${portfolioChangeAbs.toFixed(0)}) today`;
+    el.className = 'dash-sub ' + (portfolioChangePct >= 0 ? 'green' : 'red');
+  }
+
+  // SPY
+  if (spyData) {
+    document.getElementById('dashSpyPrice').textContent = '$' + spyData.price.toFixed(2);
+    const spyEl = document.getElementById('dashSpyChange');
+    spyEl.textContent = `${spyData.changePct >= 0 ? '+' : ''}${spyData.changePct.toFixed(2)}% today`;
+    spyEl.className = 'dash-sub ' + (spyData.changePct >= 0 ? 'green' : 'red');
+  }
+
+  // Alpha
+  if (hasData && spyData) {
+    const alpha = portfolioChangePct - spyData.changePct;
+    const alphaEl = document.getElementById('dashAlpha');
+    alphaEl.textContent = `${alpha >= 0 ? '+' : ''}${alpha.toFixed(2)}%`;
+    alphaEl.className = 'dash-value ' + (alpha >= 0 ? 'green' : 'red');
+  }
+
+  // Data status
+  if (lastFetchTime) {
+    document.getElementById('dashDataStatus').textContent = 'Live';
+    document.getElementById('dashDataStatus').className = 'dash-value green';
+    document.getElementById('dashDataStatus').style.fontSize = '14px';
+    const t = new Date(lastFetchTime);
+    document.getElementById('dashDataTime').textContent = 'Updated ' + t.toLocaleTimeString();
+  }
+}
+
+// ─── Portfolio Render ─────────────────────────────────────────────────────────
+function renderPortfolio() {
+  const total = portfolio.reduce((s, x) => s + x.amount, 0);
+  document.getElementById('totalBadge').textContent = `$${total.toLocaleString('en-US', {minimumFractionDigits:2})} invested`;
+
+  const tbody = document.getElementById('portfolioBody');
+  tbody.innerHTML = '';
+
+  portfolio.forEach((stock, i) => {
+    const pct = total > 0 ? ((stock.amount / total) * 100).toFixed(1) : 0;
+    const quote = marketData[stock.ticker];
+
+    let priceCell = '<span style="color:var(--muted)">--</span>';
+    let changeCell = '<span style="color:var(--muted)">--</span>';
+
+    if (quote) {
+      priceCell = `$${quote.price.toFixed(2)}`;
+      const cls = quote.changePct > 0 ? 'up' : quote.changePct < 0 ? 'down' : 'flat';
+      const sign = quote.changePct >= 0 ? '+' : '';
+      changeCell = `<span class="price-change ${cls}">${sign}${quote.changePct.toFixed(2)}%</span>`;
+    }
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="ticker-badge">${stock.ticker}</span></td>
+      <td>
+        <input class="inline-input" value="${stock.company}"
+          onchange="updateStock(${i}, 'company', this.value)" style="width:140px;" />
+      </td>
+      <td>
+        <input class="inline-input" type="number" value="${stock.amount}"
+          onchange="updateStock(${i}, 'amount', parseFloat(this.value))" />
+      </td>
+      <td>${priceCell}</td>
+      <td>${changeCell}</td>
+      <td>
+        <div class="allocation-bar">
+          <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+          <span class="alloc-pct">${pct}%</span>
+        </div>
+      </td>
+      <td><button class="remove-btn" onclick="removeStock(${i})">&#10005;</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  savePortfolio();
+}
+
+function updateStock(i, key, val) {
+  portfolio[i][key] = val;
+  renderPortfolio();
+  updateDashboard();
+}
+
+function removeStock(i) {
+  portfolio.splice(i, 1);
+  renderPortfolio();
+  updateDashboard();
+  addLog('Stock removed from portfolio', 'info');
+}
+
+function addStock() {
+  const ticker  = document.getElementById('newTicker').value.trim().toUpperCase();
+  const company = document.getElementById('newCompany').value.trim();
+  const amount  = parseFloat(document.getElementById('newAmount').value);
+  if (!ticker || !company || isNaN(amount) || amount <= 0) {
+    showToast('Please fill in ticker, company, and a valid amount', 'error');
+    return;
+  }
+  portfolio.push({ ticker, company, amount });
+  renderPortfolio();
+  updateDashboard();
+  document.getElementById('newTicker').value = '';
+  document.getElementById('newCompany').value = '';
+  document.getElementById('newAmount').value = '';
+  addLog(`Added ${ticker} ($${amount}) to portfolio`, 'info');
+  showToast(`${ticker} added to portfolio`, 'success');
+}
+
+function savePortfolio() {
+  localStorage.setItem('apexPortfolio', JSON.stringify(portfolio));
+}
+
+// ─── AI Analysis ─────────────────────────────────────────────────────────────
+async function runAnalysis(auto = false) {
+  if (portfolio.length === 0) { showToast('Add stocks to your portfolio first', 'error'); return; }
+  if (!config.anthropicKey) { showToast('Add your Anthropic API key in Configuration', 'error'); return; }
+
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+
+  document.getElementById('analysisBody').innerHTML = `
+    <div class="analysis-loading">
+      <div class="spinner"></div>
+      <span>Fetching market data & running AI analysis...</span>
+    </div>`;
+
+  addLog(`${auto ? 'Scheduled' : 'Manual'} analysis started`, 'info');
+
+  // Fetch fresh market data if we have an AV key
+  if (config.avKey) {
+    try {
+      await fetchMarketData();
+    } catch (e) {
+      addLog('Market data fetch failed, using cached data: ' + e.message, 'alert');
+    }
+  }
+
+  const total = portfolio.reduce((s, x) => s + x.amount, 0);
+
+  // Build data-rich holdings summary
+  const holdingsLines = portfolio.map(s => {
+    const quote = marketData[s.ticker];
+    const pct = ((s.amount / total) * 100).toFixed(1);
+    let line = `${s.ticker} (${s.company}): $${s.amount} invested — ${pct}% of portfolio`;
+    if (quote) {
+      line += `\n  Current price: $${quote.price.toFixed(2)} | Today: ${quote.changePct >= 0 ? '+' : ''}${quote.changePct.toFixed(2)}%`;
+      line += ` | Day range: $${quote.low.toFixed(2)}–$${quote.high.toFixed(2)}`;
+      line += ` | Prev close: $${quote.prevClose.toFixed(2)} | Volume: ${quote.volume.toLocaleString()}`;
+    }
+    return line;
+  }).join('\n\n');
+
+  // Calculate portfolio-level metrics
+  let portfolioChangePct = 0;
+  let dataAvailable = false;
+  portfolio.forEach(s => {
+    const quote = marketData[s.ticker];
+    if (quote) {
+      dataAvailable = true;
+      portfolioChangePct += (s.amount / total) * quote.changePct;
+    }
+  });
+
+  let benchmarkSection = '';
+  if (spyData && dataAvailable) {
+    const alpha = portfolioChangePct - spyData.changePct;
+    benchmarkSection = `
+BENCHMARK COMPARISON (today):
+- Portfolio weighted return: ${portfolioChangePct >= 0 ? '+' : ''}${portfolioChangePct.toFixed(2)}%
+- S&P 500 (SPY): $${spyData.price.toFixed(2)}, ${spyData.changePct >= 0 ? '+' : ''}${spyData.changePct.toFixed(2)}%
+- Alpha (excess return): ${alpha >= 0 ? '+' : ''}${alpha.toFixed(2)}%
+- SPY day range: $${spyData.low.toFixed(2)}–$${spyData.high.toFixed(2)}, Volume: ${spyData.volume.toLocaleString()}`;
+  }
+
+  const today = new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  const prompt = `You are APEX, an elite AI portfolio strategist. Your mission: help this $${total.toLocaleString()} aggressive portfolio OUTPERFORM the S&P 500 over 1-3 years.
+
+Today is ${today}.
+
+PORTFOLIO HOLDINGS (with live market data):
+${holdingsLines}
+${benchmarkSection}
+
+ANALYSIS FRAMEWORK — Evaluate each position on:
+1. MOMENTUM: Is the stock trending up/down? How does today's action compare to recent behavior?
+2. RELATIVE STRENGTH: Is this stock outperforming or underperforming SPY? Winners tend to keep winning.
+3. CONCENTRATION RISK: Any position >25% is dangerous. Flag it.
+4. SECTOR EXPOSURE: Is the portfolio too concentrated in one sector?
+5. CATALYST AWARENESS: Any upcoming earnings, product launches, regulatory events that could move these stocks?
+
+RESPOND WITH:
+1. PORTFOLIO SCORE (1-10): Rate the portfolio's ability to beat the S&P 500 from its current positioning.
+2. OVERALL ASSESSMENT (2-3 sentences): Current positioning and biggest strengths/weaknesses.
+3. VERDICT: Either "HOLD — No changes needed" OR "ACT — Rebalance recommended"
+4. If ACT: Specific trades with dollar amounts. Example: "TRIM: Sell $200 of MU → ADD: Buy $200 of [TICKER] because [reason]"
+5. RISK FLAGS: Any position-specific or portfolio-level risks.
+6. WATCHLIST: 2-3 stocks the user should consider adding to better compete with the S&P 500 (with brief reasoning).
+
+Be direct, data-driven, and specific. No generic advice. Every recommendation must reference the actual data above. This is a real $${total.toLocaleString()} portfolio — treat it seriously.`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': config.anthropicKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error?.message || `API error ${res.status}`);
+    }
+
+    const data = await res.json();
+    const text = data.content?.[0]?.text || 'No response received.';
+
+    const needsAction = /\bact\b/i.test(text) && (/rebalance/i.test(text) || /trim|sell|reduce|exit/i.test(text));
+
+    const alertClass = needsAction ? 'action' : 'hold';
+    const alertIcon  = needsAction ? '&#128680;' : '&#9989;';
+    const alertTitle = needsAction ? 'ACTION REQUIRED — Rebalance Recommended' : 'HOLD — Portfolio On Track';
+
+    // Format the text with some basic markdown-like rendering
+    const formatted = text
+      .replace(/\n/g, '<br>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/^(#+)\s*(.*)/gm, (_, h, t) => `<strong style="font-size:14px;">${t}</strong>`);
+
+    document.getElementById('analysisBody').innerHTML = `
+      <div class="analysis-result">${formatted}</div>
+      <div class="alert-box ${alertClass}">
+        <div class="alert-title">${alertIcon} ${alertTitle}</div>
+        ${needsAction
+          ? 'Review the specific trades recommended above. Consider executing within the next trading session.'
+          : 'Portfolio is well-positioned. Continue monitoring at next market open.'}
+      </div>`;
+
+    document.getElementById('lastRunTime').textContent = 'Last run: ' + new Date().toLocaleTimeString();
+    addLog(`Analysis complete — Verdict: ${needsAction ? 'ACT' : 'HOLD'}`, needsAction ? 'alert' : 'ok');
+
+    // Send email alert if configured
+    if (config.ejsPublicKey) {
+      if (needsAction) {
+        await sendAlertEmail(text, 'ACTION REQUIRED');
+      } else if (auto) {
+        await sendAlertEmail(text, 'HOLD');
+      }
+    }
+
+  } catch(e) {
+    document.getElementById('analysisBody').innerHTML = `
+      <div class="analysis-empty">
+        <div class="icon">&#9888;&#65039;</div>
+        <div>Analysis failed: ${e.message}</div>
+        <div style="font-size:10px; color:var(--muted); margin-top:4px;">Check your API key and try again</div>
+      </div>`;
+    addLog('Analysis failed: ' + e.message, 'alert');
+  }
+
+  btn.disabled = false;
+}
+
+async function sendAlertEmail(analysisText, verdict) {
+  if (!config.ejsPublicKey || !config.ejsServiceId || !config.ejsTemplateId || !config.email) return;
+  try {
+    const total = portfolio.reduce((s, x) => s + x.amount, 0);
+    const subject = verdict === 'ACTION REQUIRED'
+      ? 'APEX ALERT — Portfolio Action Required'
+      : 'APEX Daily Check — Portfolio Holding Steady';
+
+    let benchLine = '';
+    if (spyData) {
+      benchLine = `\nSPY: $${spyData.price.toFixed(2)} (${spyData.changePct >= 0 ? '+' : ''}${spyData.changePct.toFixed(2)}%)`;
+    }
+
+    const message = `APEX PORTFOLIO MONITOR — ${new Date().toLocaleDateString()}
+Verdict: ${verdict}
+
+PORTFOLIO: $${total.toLocaleString()}
+${portfolio.map(s => {
+  const q = marketData[s.ticker];
+  return `${s.ticker}: $${s.amount}${q ? ` (price: $${q.price.toFixed(2)}, ${q.changePct >= 0 ? '+' : ''}${q.changePct.toFixed(2)}%)` : ''}`;
+}).join('\n')}${benchLine}
+
+AI ANALYSIS:
+${analysisText}
+
+---
+Generated by APEX AI Portfolio Monitor`;
+
+    await emailjs.send(config.ejsServiceId, config.ejsTemplateId, {
+      to_email: config.email,
+      subject,
+      message
+    });
+    addLog(`Email alert sent — ${verdict}`, 'ok');
+    showToast('Alert emailed to ' + config.email, 'success');
+  } catch(e) {
+    addLog('Email send failed: ' + (e.text || e.message), 'alert');
+  }
+}
+
+async function testEmail() {
+  if (!config.ejsPublicKey) { showToast('Save your configuration first', 'error'); return; }
+  showToast('Sending test email...');
+  try {
+    await emailjs.send(config.ejsServiceId, config.ejsTemplateId, {
+      to_email: config.email,
+      subject: 'APEX — Connection Test',
+      message: `Your APEX Portfolio Monitor is connected.\n\nPortfolio: ${portfolio.map(s => s.ticker).join(', ')}\nTotal: $${portfolio.reduce((s,x) => s + x.amount, 0).toLocaleString()}\n\nYou'll receive AI alerts with live market data.`
+    });
+    showToast('Test email sent! Check your inbox.', 'success');
+    addLog(`Test email sent to ${config.email}`, 'ok');
+  } catch(e) {
+    showToast('Email failed — check your IDs/key', 'error');
+    addLog('Test email failed: ' + (e.text || e.message), 'alert');
+  }
+}
+
+// ─── Scheduler ────────────────────────────────────────────────────────────────
+function toggleScheduler() {
+  const btn = document.getElementById('scheduleBtn');
+  if (schedulerActive) {
+    clearTimeout(schedulerInterval);
+    schedulerInterval = null;
+    schedulerActive = false;
+    btn.textContent = 'Start Auto-Monitor';
+    btn.className = 'btn btn-secondary';
+    document.getElementById('nextCheckDisplay').style.display = 'none';
+    updateStatus('READY', true);
+    addLog('Auto-monitor stopped', 'info');
+    showToast('Auto-monitor stopped');
+  } else {
+    if (!config.anthropicKey || !config.avKey) {
+      showToast('Configure API keys first', 'error'); return;
+    }
+    schedulerActive = true;
+    btn.textContent = 'Stop Auto-Monitor';
+    btn.className = 'btn btn-danger';
+    updateStatus('AUTO-MONITORING', true);
+    addLog('Auto-monitor started — checks every market open (Mon-Fri)', 'ok');
+    showToast('Auto-monitor active!', 'success');
+
+    runAnalysis(true);
+    scheduleNextCheck();
+  }
+}
+
+function scheduleNextCheck() {
+  if (!schedulerActive) return;
+  const next = getNextMarketOpen();
+  const msUntil = next - Date.now();
+  document.getElementById('nextCheckDisplay').style.display = 'flex';
+  startCountdown(next);
+  schedulerInterval = setTimeout(() => {
+    if (schedulerActive) {
+      runAnalysis(true);
+      scheduleNextCheck();
+    }
+  }, msUntil);
+}
+
+function getNextMarketOpen() {
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(9, 30, 0, 0);
+  const etOffset = isDST(now) ? 4 : 5;
+  const utcOpen = new Date(next.getTime() + etOffset * 3600000);
+  if (Date.now() >= utcOpen.getTime()) {
+    utcOpen.setDate(utcOpen.getDate() + 1);
+  }
+  while (utcOpen.getDay() === 0 || utcOpen.getDay() === 6) {
+    utcOpen.setDate(utcOpen.getDate() + 1);
+  }
+  return utcOpen;
+}
+
+function isDST(d) {
+  const jan = new Date(d.getFullYear(), 0, 1).getTimezoneOffset();
+  const jul = new Date(d.getFullYear(), 6, 1).getTimezoneOffset();
+  return Math.min(jan, jul) === d.getTimezoneOffset();
+}
+
+function startCountdown(target) {
+  const el = document.getElementById('nextCheckTimer');
+  const tick = () => {
+    if (!schedulerActive) return;
+    const diff = target - Date.now();
+    if (diff <= 0) { el.textContent = 'Now'; return; }
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    el.textContent = `${h}h ${m}m ${s}s`;
+    setTimeout(tick, 1000);
+  };
+  tick();
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function updateStatus(text, active) {
+  document.getElementById('statusText').textContent = text;
+  const pill = document.getElementById('statusPill');
+  pill.style.color = active ? 'var(--accent)' : 'var(--muted)';
+  pill.style.borderColor = active ? 'rgba(0,229,160,0.2)' : 'var(--border)';
+  pill.style.background = active ? 'rgba(0,229,160,0.07)' : 'transparent';
+}
+
+function addLog(msg, type = 'info') {
+  const now = new Date().toLocaleTimeString();
+  log.unshift({ time: now, msg, type });
+  if (log.length > 50) log.pop();
+  renderLog();
+}
+
+function renderLog() {
+  const body = document.getElementById('logBody');
+  document.getElementById('logCount').textContent = log.length + ' entries';
+  if (log.length === 0) {
+    body.innerHTML = '<div style="color:var(--muted); font-size:11px; text-align:center; padding:20px;">No activity yet</div>';
+    return;
+  }
+  body.innerHTML = log.map(e => `
+    <div class="log-entry">
+      <span class="log-time">${e.time}</span>
+      <span class="log-msg">${e.msg}</span>
+      <span class="log-type ${e.type}">${e.type.toUpperCase()}</span>
+    </div>`).join('');
+}
+
+function clearLog() {
+  log = [];
+  renderLog();
+}
+
+function showToast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + type;
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const t = document.getElementById('newTicker');
+  if (t) t.addEventListener('input', () => t.value = t.value.toUpperCase());
+});
+</script>
+</body>
+</html>

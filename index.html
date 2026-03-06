@@ -871,9 +871,6 @@
   <div class="header">
     <div class="logo">APE<span>X</span></div>
     <div style="display:flex; gap:16px; align-items:center;">
-      <div class="next-check" id="nextCheckDisplay" style="display:none;">
-        Next check: <strong id="nextCheckTimer">--</strong>
-      </div>
       <div class="status-pill" id="statusPill">
         <div class="pulse"></div>
         <span id="statusText">SETUP REQUIRED</span>
@@ -956,21 +953,12 @@
       <tbody id="portfolioBody"></tbody>
     </table>
 
-    <div class="add-row">
-      <input type="text" id="newTicker" placeholder="TICKER" style="max-width:90px; text-transform:uppercase;" />
-      <input type="text" id="newCompany" placeholder="Company name" style="max-width:180px;" />
-      <input type="number" id="newAmount" placeholder="$ Amount" style="max-width:120px;" />
-      <button class="btn btn-secondary" onclick="addStock()">+ Add Stock</button>
-    </div>
   </div>
 
   <!-- Action bar -->
   <div class="action-bar">
     <button class="btn btn-primary" id="runBtn" onclick="runAnalysis()">
       Run AI Analysis
-    </button>
-    <button class="btn btn-secondary" id="scheduleBtn" onclick="toggleScheduler()">
-      Start Auto-Monitor
     </button>
     <div class="spacer"></div>
     <button class="btn btn-danger" onclick="clearLog()">Clear Log</button>
@@ -1026,8 +1014,6 @@ let marketData = {}; // { TICKER: { price, change, changePct, high, low, volume,
 let spyData = null;  // same shape for SPY
 let lastFetchTime = null;
 
-let schedulerInterval = null;
-let schedulerActive = false;
 let log = [];
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
@@ -1402,83 +1388,6 @@ async function runAnalysis(auto = false) {
   }
 
   btn.disabled = false;
-}
-
-// ─── Scheduler ────────────────────────────────────────────────────────────────
-function toggleScheduler() {
-  const btn = document.getElementById('scheduleBtn');
-  if (schedulerActive) {
-    clearTimeout(schedulerInterval);
-    schedulerInterval = null;
-    schedulerActive = false;
-    btn.textContent = 'Start Auto-Monitor';
-    btn.className = 'btn btn-secondary';
-    document.getElementById('nextCheckDisplay').style.display = 'none';
-    updateStatus('READY', true);
-    addLog('Auto-monitor stopped', 'info');
-    showToast('Auto-monitor stopped');
-  } else {
-    // Scheduler is mainly for in-browser; cron handles the real auto-monitoring
-    schedulerActive = true;
-    btn.textContent = 'Stop Auto-Monitor';
-    btn.className = 'btn btn-danger';
-    updateStatus('AUTO-MONITORING', true);
-    addLog('Auto-monitor started — checks every market open (Mon-Fri)', 'ok');
-    showToast('Auto-monitor active!', 'success');
-
-    runAnalysis(true);
-    scheduleNextCheck();
-  }
-}
-
-function scheduleNextCheck() {
-  if (!schedulerActive) return;
-  const next = getNextMarketOpen();
-  const msUntil = next - Date.now();
-  document.getElementById('nextCheckDisplay').style.display = 'flex';
-  startCountdown(next);
-  schedulerInterval = setTimeout(() => {
-    if (schedulerActive) {
-      runAnalysis(true);
-      scheduleNextCheck();
-    }
-  }, msUntil);
-}
-
-function getNextMarketOpen() {
-  const now = new Date();
-  const next = new Date(now);
-  next.setHours(9, 30, 0, 0);
-  const etOffset = isDST(now) ? 4 : 5;
-  const utcOpen = new Date(next.getTime() + etOffset * 3600000);
-  if (Date.now() >= utcOpen.getTime()) {
-    utcOpen.setDate(utcOpen.getDate() + 1);
-  }
-  while (utcOpen.getDay() === 0 || utcOpen.getDay() === 6) {
-    utcOpen.setDate(utcOpen.getDate() + 1);
-  }
-  return utcOpen;
-}
-
-function isDST(d) {
-  const jan = new Date(d.getFullYear(), 0, 1).getTimezoneOffset();
-  const jul = new Date(d.getFullYear(), 6, 1).getTimezoneOffset();
-  return Math.min(jan, jul) === d.getTimezoneOffset();
-}
-
-function startCountdown(target) {
-  const el = document.getElementById('nextCheckTimer');
-  const tick = () => {
-    if (!schedulerActive) return;
-    const diff = target - Date.now();
-    if (diff <= 0) { el.textContent = 'Now'; return; }
-    const h = Math.floor(diff / 3600000);
-    const m = Math.floor((diff % 3600000) / 60000);
-    const s = Math.floor((diff % 60000) / 1000);
-    el.textContent = `${h}h ${m}m ${s}s`;
-    setTimeout(tick, 1000);
-  };
-  tick();
 }
 
 // ─── Alpha Tracker ────────────────────────────────────────────────────────

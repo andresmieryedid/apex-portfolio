@@ -891,14 +891,6 @@ function updateDashboard() {
     alphaEl.className = 'dash-value ' + (alpha >= 0 ? 'green' : 'red');
   }
 
-  // Data status
-  if (lastFetchTime) {
-    document.getElementById('dashDataStatus').textContent = 'Live';
-    document.getElementById('dashDataStatus').className = 'dash-value green';
-    document.getElementById('dashDataStatus').style.fontSize = '14px';
-    const t = new Date(lastFetchTime);
-    document.getElementById('dashDataTime').textContent = 'Updated ' + t.toLocaleTimeString();
-  }
 }
 
 // ─── Portfolio Render ─────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>APEX — AI Portfolio Monitor</title>
+<title>Vitru LLC — AI Portfolio Monitor</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -869,7 +869,7 @@
 
   <!-- Header -->
   <div class="header">
-    <div class="logo">APE<span>X</span></div>
+    <div class="logo">VITR<span>U</span></div>
     <div style="display:flex; gap:16px; align-items:center;">
       <div class="status-pill" id="statusPill">
         <div class="pulse"></div>
@@ -1020,10 +1020,10 @@ let log = [];
 window.onload = () => {
   updateStatus('READY', true);
 
-  const savedPortfolio = localStorage.getItem('apexPortfolio');
+  const savedPortfolio = localStorage.getItem('vitruPortfolio');
   if (savedPortfolio) portfolio = JSON.parse(savedPortfolio);
 
-  const savedMarket = localStorage.getItem('apexMarketData');
+  const savedMarket = localStorage.getItem('vitruMarketData');
   if (savedMarket) {
     const parsed = JSON.parse(savedMarket);
     marketData = parsed.stocks || {};
@@ -1033,7 +1033,7 @@ window.onload = () => {
   }
 
   renderPortfolio();
-  addLog('APEX initialized — portfolio loaded', 'info');
+  addLog('Vitru initialized — portfolio loaded', 'info');
 };
 
 
@@ -1063,7 +1063,7 @@ async function fetchMarketData() {
     if (data.spyData) spyData = data.spyData;
     lastFetchTime = data.timestamp;
 
-    localStorage.setItem('apexMarketData', JSON.stringify({
+    localStorage.setItem('vitruMarketData', JSON.stringify({
       stocks: marketData, spy: spyData, time: lastFetchTime,
     }));
 
@@ -1200,7 +1200,7 @@ function addStock() {
 }
 
 function savePortfolio() {
-  localStorage.setItem('apexPortfolio', JSON.stringify(portfolio));
+  localStorage.setItem('vitruPortfolio', JSON.stringify(portfolio));
 }
 
 // ─── AI Analysis ─────────────────────────────────────────────────────────────
@@ -1241,7 +1241,7 @@ async function runAnalysis(auto = false) {
     if (data.spyData) spyData = data.spyData;
     lastFetchTime = data.timestamp;
 
-    localStorage.setItem('apexMarketData', JSON.stringify({
+    localStorage.setItem('vitruMarketData', JSON.stringify({
       stocks: marketData, spy: spyData, time: lastFetchTime,
     }));
 

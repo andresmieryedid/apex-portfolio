@@ -715,14 +715,34 @@
       <div class="dash-sub" id="dashSpyChange">--</div>
     </div>
     <div class="dash-card">
-      <div class="dash-label">Your Alpha</div>
+      <div class="dash-label">Today's Alpha</div>
       <div class="dash-value" id="dashAlpha">--</div>
       <div class="dash-sub">vs S&P 500 today</div>
     </div>
     <div class="dash-card">
-      <div class="dash-label">Market Data</div>
-      <div class="dash-value" id="dashDataStatus" style="font-size:14px;">No data yet</div>
-      <div class="dash-sub" id="dashDataTime">--</div>
+      <div class="dash-label">YTD Alpha → +10% Target</div>
+      <div class="dash-value" id="dashYtdAlpha">--</div>
+      <div class="dash-sub" id="dashAlphaGap">--</div>
+    </div>
+  </div>
+
+  <!-- Alpha Target Progress Bar -->
+  <div class="setup-card" id="alphaTracker" style="padding:18px 24px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <div>
+        <div class="section-label">Mission: +10% Alpha</div>
+        <span style="font-size:12px; color:var(--text);" id="alphaStatusText">Tracking not started</span>
+      </div>
+      <div style="text-align:right;">
+        <span style="font-size:11px; color:var(--muted);" id="alphaDaysLeft">--</span>
+      </div>
+    </div>
+    <div class="bar-track" style="height:8px; border-radius:4px;">
+      <div class="bar-fill" id="alphaProgressBar" style="width:0%; height:100%; border-radius:4px; transition:width 0.6s ease;"></div>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-top:6px;">
+      <span style="font-size:10px; color:var(--muted);">0%</span>
+      <span style="font-size:10px; color:var(--accent);">+10% alpha</span>
     </div>
   </div>
 
@@ -1127,6 +1147,11 @@ async function runAnalysis(auto = false) {
       addLog(`Alpha vs S&P 500: ${data.alpha >= 0 ? '+' : ''}${data.alpha.toFixed(2)}%`, data.alpha >= 0 ? 'ok' : 'alert');
     }
 
+    // Update YTD alpha tracker
+    if (data.ytdAlpha !== undefined) {
+      updateAlphaTracker(data);
+    }
+
   } catch(e) {
     document.getElementById('analysisBody').innerHTML = `
       <div class="analysis-empty">
@@ -1272,6 +1297,38 @@ function startCountdown(target) {
     setTimeout(tick, 1000);
   };
   tick();
+}
+
+// ─── Alpha Tracker ────────────────────────────────────────────────────────
+function updateAlphaTracker(data) {
+  const ytd = data.ytdAlpha || 0;
+  const target = data.targetAlpha || 10;
+  const gap = data.alphaGap || (target - ytd);
+  const daysLeft = data.tradingDaysLeft || 252;
+  const onTrack = data.onTrack;
+  const pct = Math.max(0, Math.min(100, (ytd / target) * 100));
+
+  // YTD Alpha card
+  const ytdEl = document.getElementById('dashYtdAlpha');
+  ytdEl.textContent = `${ytd >= 0 ? '+' : ''}${ytd.toFixed(2)}%`;
+  ytdEl.className = 'dash-value ' + (ytd >= 0 ? 'green' : 'red');
+
+  const gapEl = document.getElementById('dashAlphaGap');
+  gapEl.textContent = `${gap.toFixed(1)}% to go`;
+  gapEl.className = 'dash-sub ' + (onTrack ? 'green' : 'red');
+
+  // Progress bar
+  document.getElementById('alphaProgressBar').style.width = pct + '%';
+  document.getElementById('alphaDaysLeft').textContent = `~${daysLeft} trading days left`;
+
+  const statusEl = document.getElementById('alphaStatusText');
+  if (onTrack) {
+    statusEl.textContent = `On pace — ${ytd.toFixed(2)}% of ${target}% target`;
+    statusEl.style.color = 'var(--accent)';
+  } else {
+    statusEl.textContent = `Behind pace — need +${gap.toFixed(1)}% in ${daysLeft} days`;
+    statusEl.style.color = 'var(--danger)';
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

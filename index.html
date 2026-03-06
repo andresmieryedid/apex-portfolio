@@ -441,6 +441,181 @@
 
   .analysis-result { font-size: 13px; line-height: 1.8; color: var(--text); }
 
+  /* Structured analysis cards */
+  .analysis-grid {
+    display: grid;
+    gap: 16px;
+  }
+
+  .analysis-top {
+    display: flex;
+    gap: 16px;
+    align-items: stretch;
+  }
+  @media (max-width: 600px) { .analysis-top { flex-direction: column; } }
+
+  .grade-card {
+    min-width: 100px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    gap: 6px;
+  }
+
+  .grade-letter {
+    font-family: 'Syne', sans-serif;
+    font-size: 48px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .grade-label {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .summary-card {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text);
+  }
+
+  .trades-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 600px) { .trades-section { grid-template-columns: 1fr; } }
+
+  .trade-card {
+    border-radius: 10px;
+    padding: 18px 20px;
+    border: 1px solid;
+  }
+
+  .trade-card.sell {
+    background: rgba(255,69,96,0.05);
+    border-color: rgba(255,69,96,0.2);
+  }
+
+  .trade-card.buy {
+    background: rgba(0,229,160,0.05);
+    border-color: rgba(0,229,160,0.2);
+  }
+
+  .trade-card-header {
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .trade-card.sell .trade-card-header { color: var(--danger); }
+  .trade-card.buy .trade-card-header { color: var(--accent); }
+
+  .trade-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .trade-item:last-child { border-bottom: none; }
+
+  .trade-ticker {
+    font-weight: 500;
+    font-size: 14px;
+  }
+  .trade-card.sell .trade-ticker { color: var(--danger); }
+  .trade-card.buy .trade-ticker { color: var(--accent); }
+
+  .trade-amount {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .trade-reason {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .convictions-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+
+  .convictions-card h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--accent2);
+    margin-bottom: 12px;
+  }
+
+  .conviction-item {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .conviction-item:last-child { border-bottom: none; }
+
+  .conviction-ticker {
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .conviction-thesis {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+    line-height: 1.5;
+  }
+
+  .risk-card {
+    background: rgba(245,166,35,0.05);
+    border: 1px solid rgba(245,166,35,0.15);
+    border-radius: 10px;
+    padding: 14px 20px;
+    font-size: 12px;
+    color: #ffc96a;
+    line-height: 1.6;
+  }
+
+  .risk-card strong {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .no-trades {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
   .alert-box {
     margin-top: 16px;
     padding: 16px 20px;
@@ -1004,7 +1179,7 @@ async function runAnalysis(auto = false) {
     }
 
     const data = await res.json();
-    const text = data.analysis;
+    const a = data.analysis; // structured object
 
     // Update market data from server response
     if (data.marketData) {
@@ -1022,21 +1197,81 @@ async function runAnalysis(auto = false) {
     renderPortfolio();
 
     const needsAction = data.verdict === 'ACTION REQUIRED';
-    const alertClass = needsAction ? 'action' : 'hold';
-    const alertIcon  = needsAction ? '&#128680;' : '&#9989;';
-    const alertTitle = needsAction ? 'ACTION REQUIRED — Rebalance Recommended' : 'HOLD — Portfolio On Track';
 
-    const formatted = text
-      .replace(/\n/g, '<br>')
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Grade color
+    const gradeColors = { 'A': 'var(--accent)', 'B': 'var(--accent2)', 'C': 'var(--warn)', 'D': 'var(--danger)', 'F': 'var(--danger)' };
+    const gradeColor = gradeColors[a.grade?.[0]] || 'var(--muted)';
+
+    // Build sells HTML
+    const sellsHtml = (a.sells && a.sells.length > 0)
+      ? a.sells.map(s => `
+        <div class="trade-item">
+          <div>
+            <div class="trade-ticker">${s.ticker}</div>
+            <div class="trade-reason">${s.reason}</div>
+          </div>
+          <div class="trade-amount" style="color:var(--danger);">-$${s.amount}</div>
+        </div>`).join('')
+      : '<div class="no-trades">No sells recommended</div>';
+
+    // Build buys HTML
+    const buysHtml = (a.buys && a.buys.length > 0)
+      ? a.buys.map(b => `
+        <div class="trade-item">
+          <div>
+            <div class="trade-ticker">${b.ticker}</div>
+            <div class="trade-reason">${b.reason}</div>
+          </div>
+          <div class="trade-amount" style="color:var(--accent);">+$${b.amount}</div>
+        </div>`).join('')
+      : '<div class="no-trades">No buys recommended</div>';
+
+    // Build convictions HTML
+    const convictionsHtml = (a.convictions && a.convictions.length > 0)
+      ? a.convictions.map(c => `
+        <div class="conviction-item">
+          <div class="conviction-ticker">${c.ticker}</div>
+          <div class="conviction-thesis">${c.thesis}</div>
+        </div>`).join('')
+      : '';
 
     document.getElementById('analysisBody').innerHTML = `
-      <div class="analysis-result">${formatted}</div>
-      <div class="alert-box ${alertClass}">
-        <div class="alert-title">${alertIcon} ${alertTitle}</div>
-        ${needsAction
-          ? 'Review the specific trades recommended above. Consider executing within the next trading session.'
-          : 'Portfolio is well-positioned. Continue monitoring at next market open.'}
+      <div class="analysis-grid">
+        <div class="analysis-top">
+          <div class="grade-card">
+            <div class="grade-letter" style="color:${gradeColor}">${a.grade || '?'}</div>
+            <div class="grade-label">Portfolio Grade</div>
+          </div>
+          <div class="summary-card">
+            <div class="alert-box ${needsAction ? 'action' : 'hold'}" style="margin:0 0 12px 0;">
+              <div class="alert-title">${needsAction ? '&#128680; ACT — Rebalance Recommended' : '&#9989; HOLD — On Track'}</div>
+            </div>
+            ${a.summary || ''}
+          </div>
+        </div>
+
+        <div class="trades-section">
+          <div class="trade-card sell">
+            <div class="trade-card-header">Sell</div>
+            ${sellsHtml}
+          </div>
+          <div class="trade-card buy">
+            <div class="trade-card-header">Buy</div>
+            ${buysHtml}
+          </div>
+        </div>
+
+        ${convictionsHtml ? `
+        <div class="convictions-card">
+          <h3>Top Conviction Picks</h3>
+          ${convictionsHtml}
+        </div>` : ''}
+
+        ${a.risk ? `
+        <div class="risk-card">
+          <strong>Risk Warning</strong><br>
+          ${a.risk}
+        </div>` : ''}
       </div>`;
 
     document.getElementById('lastRunTime').textContent = 'Last run: ' + new Date().toLocaleTimeString();

@@ -666,17 +666,9 @@
       <span class="chevron">&#9660;</span>
     </div>
     <div class="setup-content">
-      <p>APEX needs two API keys: <strong>Alpha Vantage</strong> for live market data (free, 25 calls/day) and <strong>Anthropic</strong> for AI analysis. Email alerts via EmailJS are optional.</p>
+      <p>Email alerts are optional. API keys are configured server-side in Vercel environment variables. The AI runs automatically every market open.</p>
 
       <div class="setup-grid">
-        <div class="field full">
-          <label>Anthropic API Key</label>
-          <input type="password" id="anthropicKey" placeholder="sk-ant-..." />
-        </div>
-        <div class="field full">
-          <label>Alpha Vantage API Key (free at alphavantage.co)</label>
-          <input type="text" id="avKey" placeholder="your_alphavantage_key" />
-        </div>
         <div class="field">
           <label>Your Email Address</label>
           <input type="email" id="userEmail" placeholder="you@example.com" />
@@ -696,10 +688,11 @@
       </div>
 
       <div class="setup-note">
-        <strong>Quick start:</strong><br>
-        1. Get a free Alpha Vantage key at <a href="https://www.alphavantage.co/support/#api-key" target="_blank">alphavantage.co/support</a> (instant, no credit card)<br>
-        2. Get your Anthropic key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a><br>
-        3. (Optional) Set up <a href="https://www.emailjs.com" target="_blank">EmailJS</a> for email alerts
+        <strong>Email setup (optional):</strong><br>
+        1. Create a free account at <a href="https://www.emailjs.com" target="_blank">emailjs.com</a><br>
+        2. Add an Email Service (Gmail, Outlook, etc.) and copy the <strong>Service ID</strong><br>
+        3. Create a Template with <code>{{to_email}}</code>, <code>{{subject}}</code>, <code>{{message}}</code> and copy the <strong>Template ID</strong><br>
+        4. Go to Account > API Keys and copy your <strong>Public Key</strong>
       </div>
 
       <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
@@ -827,8 +820,6 @@ let portfolio = [
 ];
 
 let config = {
-  anthropicKey: '',
-  avKey: '',
   email: '',
   ejsServiceId: '',
   ejsTemplateId: '',
@@ -848,18 +839,13 @@ window.onload = () => {
   const savedConfig = localStorage.getItem('apexConfig');
   if (savedConfig) {
     config = JSON.parse(savedConfig);
-    document.getElementById('anthropicKey').value = config.anthropicKey || '';
-    document.getElementById('avKey').value = config.avKey || '';
     document.getElementById('userEmail').value = config.email || '';
     document.getElementById('ejsService').value = config.ejsServiceId || '';
     document.getElementById('ejsTemplate').value = config.ejsTemplateId || '';
     document.getElementById('ejsPublicKey').value = config.ejsPublicKey || '';
     if (config.ejsPublicKey) emailjs.init(config.ejsPublicKey);
-    if (config.anthropicKey && config.avKey) {
-      updateStatus('READY', true);
-      // Collapse setup if configured
-      document.getElementById('setupCard').classList.add('collapsed');
-    }
+    updateStatus('READY', true);
+    document.getElementById('setupCard').classList.add('collapsed');
   }
 
   const savedPortfolio = localStorage.getItem('apexPortfolio');
@@ -881,17 +867,11 @@ window.onload = () => {
 // ─── Config ───────────────────────────────────────────────────────────────────
 function saveConfig() {
   config = {
-    anthropicKey:  document.getElementById('anthropicKey').value.trim(),
-    avKey:         document.getElementById('avKey').value.trim(),
     email:         document.getElementById('userEmail').value.trim(),
     ejsServiceId:  document.getElementById('ejsService').value.trim(),
     ejsTemplateId: document.getElementById('ejsTemplate').value.trim(),
     ejsPublicKey:  document.getElementById('ejsPublicKey').value.trim(),
   };
-  if (!config.anthropicKey || !config.avKey) {
-    showToast('Anthropic + Alpha Vantage keys are required', 'error');
-    return;
-  }
   if (config.ejsPublicKey) emailjs.init(config.ejsPublicKey);
   localStorage.setItem('apexConfig', JSON.stringify(config));
   updateStatus('READY', true);
@@ -903,86 +883,42 @@ function toggleSetup() {
   document.getElementById('setupCard').classList.toggle('collapsed');
 }
 
-// ─── Market Data (Alpha Vantage) ──────────────────────────────────────────────
-async function fetchQuote(symbol) {
-  const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${config.avKey}`;
-  const res = await fetch(url);
-  const data = await res.json();
-
-  if (data['Note'] || data['Information']) {
-    throw new Error('Alpha Vantage rate limit hit. Wait 1 minute or upgrade your key.');
-  }
-
-  const q = data['Global Quote'];
-  if (!q || !q['05. price']) {
-    throw new Error(`No quote data for ${symbol}`);
-  }
-
-  return {
-    symbol: q['01. symbol'],
-    price: parseFloat(q['05. price']),
-    change: parseFloat(q['09. change']),
-    changePct: parseFloat(q['10. change percent']?.replace('%', '') || 0),
-    high: parseFloat(q['03. high']),
-    low: parseFloat(q['04. low']),
-    volume: parseInt(q['06. volume']),
-    prevClose: parseFloat(q['08. previous close']),
-  };
-}
-
+// ─── Market Data (via serverless API) ─────────────────────────────────────────
 async function fetchMarketData() {
-  if (!config.avKey) {
-    showToast('Add your Alpha Vantage API key first', 'error');
-    return;
-  }
-
-  addLog('Fetching live market data...', 'info');
+  addLog('Fetching live market data via server...', 'info');
   showToast('Fetching market data...');
 
-  const tickers = [...new Set(portfolio.map(s => s.ticker))];
-  const allSymbols = [...tickers, 'SPY'];
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ portfolio })
+    });
 
-  let fetched = 0;
-  let errors = [];
-
-  // Fetch sequentially to respect 5/min rate limit
-  for (const symbol of allSymbols) {
-    try {
-      const quote = await fetchQuote(symbol);
-      if (symbol === 'SPY') {
-        spyData = quote;
-      } else {
-        marketData[symbol] = quote;
-      }
-      fetched++;
-      addLog(`${symbol}: $${quote.price.toFixed(2)} (${quote.changePct >= 0 ? '+' : ''}${quote.changePct.toFixed(2)}%)`, 'ok');
-    } catch (e) {
-      errors.push(symbol);
-      addLog(`Failed to fetch ${symbol}: ${e.message}`, 'alert');
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `Server error ${res.status}`);
     }
 
-    // Small delay to avoid hitting rate limit (5 calls/min on free tier)
-    if (allSymbols.indexOf(symbol) < allSymbols.length - 1) {
-      await new Promise(r => setTimeout(r, 1500));
+    const data = await res.json();
+
+    if (data.marketData) {
+      marketData = data.marketData;
+      delete marketData['SPY'];
     }
-  }
+    if (data.spyData) spyData = data.spyData;
+    lastFetchTime = data.timestamp;
 
-  lastFetchTime = new Date().toISOString();
+    localStorage.setItem('apexMarketData', JSON.stringify({
+      stocks: marketData, spy: spyData, time: lastFetchTime,
+    }));
 
-  // Cache market data
-  localStorage.setItem('apexMarketData', JSON.stringify({
-    stocks: marketData,
-    spy: spyData,
-    time: lastFetchTime,
-  }));
-
-  updateDashboard();
-  renderPortfolio();
-
-  if (errors.length > 0) {
-    showToast(`Fetched ${fetched}/${allSymbols.length} quotes (${errors.join(', ')} failed)`, 'error');
-  } else {
-    showToast(`All ${fetched} quotes updated!`, 'success');
+    updateDashboard();
+    renderPortfolio();
+    showToast('Market data updated!', 'success');
+  } catch (e) {
+    addLog('Market data fetch failed: ' + e.message, 'alert');
+    showToast('Failed to fetch data: ' + e.message, 'error');
   }
 }
 
@@ -1124,7 +1060,6 @@ function savePortfolio() {
 // ─── AI Analysis ─────────────────────────────────────────────────────────────
 async function runAnalysis(auto = false) {
   if (portfolio.length === 0) { showToast('Add stocks to your portfolio first', 'error'); return; }
-  if (!config.anthropicKey) { showToast('Add your Anthropic API key in Configuration', 'error'); return; }
 
   const btn = document.getElementById('runBtn');
   btn.disabled = true;
@@ -1132,119 +1067,49 @@ async function runAnalysis(auto = false) {
   document.getElementById('analysisBody').innerHTML = `
     <div class="analysis-loading">
       <div class="spinner"></div>
-      <span>Fetching market data & running AI analysis...</span>
+      <span>Fetching live prices & running AI analysis (this takes ~15s)...</span>
     </div>`;
 
   addLog(`${auto ? 'Scheduled' : 'Manual'} analysis started`, 'info');
 
-  // Fetch fresh market data if we have an AV key
-  if (config.avKey) {
-    try {
-      await fetchMarketData();
-    } catch (e) {
-      addLog('Market data fetch failed, using cached data: ' + e.message, 'alert');
-    }
-  }
-
-  const total = portfolio.reduce((s, x) => s + x.amount, 0);
-
-  // Build data-rich holdings summary
-  const holdingsLines = portfolio.map(s => {
-    const quote = marketData[s.ticker];
-    const pct = ((s.amount / total) * 100).toFixed(1);
-    let line = `${s.ticker} (${s.company}): $${s.amount} invested — ${pct}% of portfolio`;
-    if (quote) {
-      line += `\n  Current price: $${quote.price.toFixed(2)} | Today: ${quote.changePct >= 0 ? '+' : ''}${quote.changePct.toFixed(2)}%`;
-      line += ` | Day range: $${quote.low.toFixed(2)}–$${quote.high.toFixed(2)}`;
-      line += ` | Prev close: $${quote.prevClose.toFixed(2)} | Volume: ${quote.volume.toLocaleString()}`;
-    }
-    return line;
-  }).join('\n\n');
-
-  // Calculate portfolio-level metrics
-  let portfolioChangePct = 0;
-  let dataAvailable = false;
-  portfolio.forEach(s => {
-    const quote = marketData[s.ticker];
-    if (quote) {
-      dataAvailable = true;
-      portfolioChangePct += (s.amount / total) * quote.changePct;
-    }
-  });
-
-  let benchmarkSection = '';
-  if (spyData && dataAvailable) {
-    const alpha = portfolioChangePct - spyData.changePct;
-    benchmarkSection = `
-BENCHMARK COMPARISON (today):
-- Portfolio weighted return: ${portfolioChangePct >= 0 ? '+' : ''}${portfolioChangePct.toFixed(2)}%
-- S&P 500 (SPY): $${spyData.price.toFixed(2)}, ${spyData.changePct >= 0 ? '+' : ''}${spyData.changePct.toFixed(2)}%
-- Alpha (excess return): ${alpha >= 0 ? '+' : ''}${alpha.toFixed(2)}%
-- SPY day range: $${spyData.low.toFixed(2)}–$${spyData.high.toFixed(2)}, Volume: ${spyData.volume.toLocaleString()}`;
-  }
-
-  const today = new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-
-  const prompt = `You are APEX, an elite AI portfolio strategist. Your mission: help this $${total.toLocaleString()} aggressive portfolio OUTPERFORM the S&P 500 over 1-3 years.
-
-Today is ${today}.
-
-PORTFOLIO HOLDINGS (with live market data):
-${holdingsLines}
-${benchmarkSection}
-
-ANALYSIS FRAMEWORK — Evaluate each position on:
-1. MOMENTUM: Is the stock trending up/down? How does today's action compare to recent behavior?
-2. RELATIVE STRENGTH: Is this stock outperforming or underperforming SPY? Winners tend to keep winning.
-3. CONCENTRATION RISK: Any position >25% is dangerous. Flag it.
-4. SECTOR EXPOSURE: Is the portfolio too concentrated in one sector?
-5. CATALYST AWARENESS: Any upcoming earnings, product launches, regulatory events that could move these stocks?
-
-RESPOND WITH:
-1. PORTFOLIO SCORE (1-10): Rate the portfolio's ability to beat the S&P 500 from its current positioning.
-2. OVERALL ASSESSMENT (2-3 sentences): Current positioning and biggest strengths/weaknesses.
-3. VERDICT: Either "HOLD — No changes needed" OR "ACT — Rebalance recommended"
-4. If ACT: Specific trades with dollar amounts. Example: "TRIM: Sell $200 of MU → ADD: Buy $200 of [TICKER] because [reason]"
-5. RISK FLAGS: Any position-specific or portfolio-level risks.
-6. WATCHLIST: 2-3 stocks the user should consider adding to better compete with the S&P 500 (with brief reasoning).
-
-Be direct, data-driven, and specific. No generic advice. Every recommendation must reference the actual data above. This is a real $${total.toLocaleString()} portfolio — treat it seriously.`;
-
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/analyze', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': config.anthropicKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
-        messages: [{ role: 'user', content: prompt }]
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ portfolio })
     });
 
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error?.message || `API error ${res.status}`);
+      throw new Error(errData.error || `Server error ${res.status}`);
     }
 
     const data = await res.json();
-    const text = data.content?.[0]?.text || 'No response received.';
+    const text = data.analysis;
 
-    const needsAction = /\bact\b/i.test(text) && (/rebalance/i.test(text) || /trim|sell|reduce|exit/i.test(text));
+    // Update market data from server response
+    if (data.marketData) {
+      marketData = data.marketData;
+      delete marketData['SPY'];
+    }
+    if (data.spyData) spyData = data.spyData;
+    lastFetchTime = data.timestamp;
 
+    localStorage.setItem('apexMarketData', JSON.stringify({
+      stocks: marketData, spy: spyData, time: lastFetchTime,
+    }));
+
+    updateDashboard();
+    renderPortfolio();
+
+    const needsAction = data.verdict === 'ACTION REQUIRED';
     const alertClass = needsAction ? 'action' : 'hold';
     const alertIcon  = needsAction ? '&#128680;' : '&#9989;';
     const alertTitle = needsAction ? 'ACTION REQUIRED — Rebalance Recommended' : 'HOLD — Portfolio On Track';
 
-    // Format the text with some basic markdown-like rendering
     const formatted = text
       .replace(/\n/g, '<br>')
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/^(#+)\s*(.*)/gm, (_, h, t) => `<strong style="font-size:14px;">${t}</strong>`);
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 
     document.getElementById('analysisBody').innerHTML = `
       <div class="analysis-result">${formatted}</div>
@@ -1256,15 +1121,10 @@ Be direct, data-driven, and specific. No generic advice. Every recommendation mu
       </div>`;
 
     document.getElementById('lastRunTime').textContent = 'Last run: ' + new Date().toLocaleTimeString();
-    addLog(`Analysis complete — Verdict: ${needsAction ? 'ACT' : 'HOLD'}`, needsAction ? 'alert' : 'ok');
+    addLog(`Analysis complete — Verdict: ${data.verdict}${data.emailSent ? ' (email sent)' : ''}`, needsAction ? 'alert' : 'ok');
 
-    // Send email alert if configured
-    if (config.ejsPublicKey) {
-      if (needsAction) {
-        await sendAlertEmail(text, 'ACTION REQUIRED');
-      } else if (auto) {
-        await sendAlertEmail(text, 'HOLD');
-      }
+    if (data.alpha !== null) {
+      addLog(`Alpha vs S&P 500: ${data.alpha >= 0 ? '+' : ''}${data.alpha.toFixed(2)}%`, data.alpha >= 0 ? 'ok' : 'alert');
     }
 
   } catch(e) {
@@ -1272,7 +1132,7 @@ Be direct, data-driven, and specific. No generic advice. Every recommendation mu
       <div class="analysis-empty">
         <div class="icon">&#9888;&#65039;</div>
         <div>Analysis failed: ${e.message}</div>
-        <div style="font-size:10px; color:var(--muted); margin-top:4px;">Check your API key and try again</div>
+        <div style="font-size:10px; color:var(--muted); margin-top:4px;">Make sure Vercel environment variables are set</div>
       </div>`;
     addLog('Analysis failed: ' + e.message, 'alert');
   }
@@ -1351,9 +1211,7 @@ function toggleScheduler() {
     addLog('Auto-monitor stopped', 'info');
     showToast('Auto-monitor stopped');
   } else {
-    if (!config.anthropicKey || !config.avKey) {
-      showToast('Configure API keys first', 'error'); return;
-    }
+    // Scheduler is mainly for in-browser; cron handles the real auto-monitoring
     schedulerActive = true;
     btn.textContent = 'Stop Auto-Monitor';
     btn.className = 'btn btn-danger';

@@ -186,11 +186,14 @@ You MUST respond with valid JSON only. No markdown, no text outside the JSON. Us
   "grade": "A",
   "summary": "2-3 sentence overall assessment",
   "verdict": "HOLD" or "ACT",
+  "holdings": [
+    { "ticker": "TICKER", "amount": 1000, "price": 150.25, "changePct": 2.5, "allocation": "20%", "status": "OUTPERFORMING" or "UNDERPERFORMING" or "NEUTRAL" }
+  ],
   "sells": [
     { "ticker": "TICKER", "amount": 400, "reason": "brief reason" }
   ],
   "buys": [
-    { "ticker": "TICKER", "amount": 400, "reason": "brief reason" }
+    { "ticker": "TICKER", "amount": 400, "reason": "brief reason", "isNew": false }
   ],
   "convictions": [
     { "ticker": "TICKER", "thesis": "1-2 sentence alpha thesis" }
@@ -199,6 +202,8 @@ You MUST respond with valid JSON only. No markdown, no text outside the JSON. Us
 }
 
 Rules:
+- "holdings" MUST include ALL current positions with their live data and status vs SPY.
+- "isNew" in buys = true if it's a stock NOT currently in the portfolio (new position to add).
 - sells and buys arrays can be empty if verdict is HOLD.
 - Every sell must have a corresponding buy of equal total amount (rebalance, not cash out).
 - Reference actual price data in reasons.

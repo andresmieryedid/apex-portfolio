@@ -616,6 +616,72 @@
     font-size: 12px;
   }
 
+  /* Holdings overview in analysis */
+  .holdings-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    overflow-x: auto;
+  }
+
+  .holdings-card h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text);
+    margin-bottom: 12px;
+  }
+
+  .holdings-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .holdings-table th {
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--muted);
+    text-transform: uppercase;
+    padding: 6px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    background: transparent;
+  }
+
+  .holdings-table td {
+    padding: 10px 12px;
+    font-size: 12px;
+    border-bottom: 1px solid rgba(30,42,53,0.3);
+  }
+
+  .holdings-table tr:last-child td { border-bottom: none; }
+
+  .status-badge {
+    font-size: 9px;
+    letter-spacing: 0.5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  .status-badge.outperforming {
+    background: rgba(0,229,160,0.1);
+    color: var(--accent);
+  }
+
+  .status-badge.underperforming {
+    background: rgba(255,69,96,0.1);
+    color: var(--danger);
+  }
+
+  .status-badge.neutral {
+    background: rgba(74,96,112,0.2);
+    color: var(--muted);
+  }
+
   .alert-box {
     margin-top: 16px;
     padding: 16px 20px;
@@ -1249,6 +1315,37 @@ async function runAnalysis(auto = false) {
             ${a.summary || ''}
           </div>
         </div>
+
+        ${a.holdings && a.holdings.length ? `
+        <div class="holdings-card">
+          <h3>Current Positions</h3>
+          <table class="holdings-table">
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>Invested</th>
+                <th>Price</th>
+                <th>Today</th>
+                <th>Weight</th>
+                <th>vs SPY</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${a.holdings.map(h => {
+                const statusCls = (h.status || '').toLowerCase().replace(/\s/g, '');
+                const changeCls = h.changePct >= 0 ? 'green' : 'red';
+                return `<tr>
+                  <td><span class="ticker-badge">${h.ticker}</span></td>
+                  <td>$${(h.amount || 0).toLocaleString()}</td>
+                  <td>$${(h.price || 0).toFixed(2)}</td>
+                  <td class="${changeCls}">${h.changePct >= 0 ? '+' : ''}${(h.changePct || 0).toFixed(2)}%</td>
+                  <td>${h.allocation || '--'}</td>
+                  <td><span class="status-badge ${statusCls}">${h.status || '--'}</span></td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>` : ''}
 
         <div class="trades-section">
           <div class="trade-card sell">

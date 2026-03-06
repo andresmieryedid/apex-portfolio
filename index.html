@@ -708,11 +708,13 @@
       <div class="dash-label">Portfolio Value</div>
       <div class="dash-value" id="dashPortfolioValue">$5,000</div>
       <div class="dash-sub" id="dashPortfolioChange">--</div>
+      <div class="dash-sub" id="dashPortfolioYtd" style="margin-top:2px;">--</div>
     </div>
     <div class="dash-card">
       <div class="dash-label">S&P 500 (SPY)</div>
       <div class="dash-value" id="dashSpyPrice">--</div>
       <div class="dash-sub" id="dashSpyChange">--</div>
+      <div class="dash-sub" id="dashSpyYtd" style="margin-top:2px;">--</div>
     </div>
     <div class="dash-card">
       <div class="dash-label">Today's Alpha</div>
@@ -1147,9 +1149,17 @@ async function runAnalysis(auto = false) {
       addLog(`Alpha vs S&P 500: ${data.alpha >= 0 ? '+' : ''}${data.alpha.toFixed(2)}%`, data.alpha >= 0 ? 'ok' : 'alert');
     }
 
-    // Update YTD alpha tracker
+    // Update YTD alpha tracker + returns
     if (data.ytdAlpha !== undefined) {
       updateAlphaTracker(data);
+
+      const ytdPEl = document.getElementById('dashPortfolioYtd');
+      ytdPEl.textContent = `YTD: ${data.ytdPortfolioReturn >= 0 ? '+' : ''}${data.ytdPortfolioReturn.toFixed(2)}%`;
+      ytdPEl.className = 'dash-sub ' + (data.ytdPortfolioReturn >= 0 ? 'green' : 'red');
+
+      const ytdSEl = document.getElementById('dashSpyYtd');
+      ytdSEl.textContent = `YTD: ${data.ytdSpyReturn >= 0 ? '+' : ''}${data.ytdSpyReturn.toFixed(2)}%`;
+      ytdSEl.className = 'dash-sub ' + (data.ytdSpyReturn >= 0 ? 'green' : 'red');
     }
 
   } catch(e) {

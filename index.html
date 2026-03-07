@@ -1363,8 +1363,9 @@ async function runAnalysis(auto = false) {
       ? a.buys.map(b => `
         <div class="trade-item">
           <div>
-            <div class="trade-ticker">${b.ticker}</div>
+            <div class="trade-ticker">${b.ticker}${b.isNew ? ' <span style="font-size:9px;color:var(--accent);border:1px solid var(--accent);padding:1px 4px;border-radius:4px;">NEW</span>' : ''}</div>
             <div class="trade-reason">${b.reason}</div>
+            ${b.targetEntry ? `<div style="font-size:10px;color:var(--muted);margin-top:4px;">Entry: <span style="color:var(--accent);">$${b.targetEntry}</span> → Target: <span style="color:var(--accent);">$${b.targetExit || '—'}</span></div>` : ''}
           </div>
           <div class="trade-amount" style="color:var(--accent);">+$${b.amount}</div>
         </div>`).join('')
@@ -1413,7 +1414,7 @@ async function runAnalysis(auto = false) {
                 const statusCls = (h.status || '').toLowerCase().replace(/\s/g, '');
                 const changeCls = h.changePct >= 0 ? 'green' : 'red';
                 return `<tr>
-                  <td><span class="ticker-badge">${h.ticker}</span></td>
+                  <td><span class="ticker-badge">${h.ticker}</span>${h.signal ? `<div style="font-size:9px;color:var(--muted);margin-top:2px;">${h.signal}</div>` : ''}</td>
                   <td>$${(h.amount || 0).toLocaleString()}</td>
                   <td>$${(h.price || 0).toFixed(2)}</td>
                   <td class="${changeCls}">${h.changePct >= 0 ? '+' : ''}${(h.changePct || 0).toFixed(2)}%</td>

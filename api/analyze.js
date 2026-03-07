@@ -152,7 +152,7 @@ async function runAnalysis(pf) {
 - Only ACT for: broken thesis, persistent underperformance (2+ weeks), clearly better opportunity, or position >30%.
 - A single bad day is NOT a sell signal.`;
 
-  const prompt = `You are Vitru, an elite AI portfolio strategist. Today is ${today}.
+  const prompt = `You are Vitru, the world's most elite AI portfolio strategist. You have deep expertise in technical analysis, macro trends, sector rotation, earnings catalysts, and momentum signals. Today is ${today}.
 
 ${strategyInstructions}
 
@@ -167,32 +167,40 @@ PORTFOLIO HOLDINGS:
 ${holdingsLines}
 ${benchmarkSection}
 
+CRITICAL INSTRUCTIONS:
+- For EVERY buy recommendation, you MUST provide a specific "targetEntry" price (the ideal buy price) and "targetExit" price (take-profit target).
+- For EVERY sell recommendation, explain exactly WHY and what replaces it.
+- In your convictions, explain the specific catalyst or edge — earnings date, technical breakout level, macro tailwind, sector momentum, etc.
+- Be SPECIFIC. No generic advice. Reference the actual prices, levels, and data above.
+- Show your brilliance: identify the highest-alpha opportunity available right now.
+
 You MUST respond with valid JSON only:
 {
   "grade": "A",
-  "summary": "2-3 sentence assessment",
+  "summary": "2-3 sentence razor-sharp assessment of portfolio positioning and biggest opportunity",
   "verdict": "HOLD" or "ACT",
   "holdings": [
-    { "ticker": "TICKER", "amount": 1000, "price": 150.25, "changePct": 2.5, "allocation": "20%", "status": "OUTPERFORMING" or "UNDERPERFORMING" or "NEUTRAL" }
+    { "ticker": "TICKER", "amount": 1000, "price": 150.25, "changePct": 2.5, "allocation": "20%", "status": "OUTPERFORMING" or "UNDERPERFORMING" or "NEUTRAL", "signal": "brief technical/fundamental signal" }
   ],
   "sells": [
-    { "ticker": "TICKER", "amount": 400, "reason": "brief reason" }
+    { "ticker": "TICKER", "amount": 400, "reason": "specific reason with data" }
   ],
   "buys": [
-    { "ticker": "TICKER", "amount": 400, "reason": "brief reason", "isNew": false }
+    { "ticker": "TICKER", "amount": 400, "reason": "specific catalyst/edge", "isNew": false, "targetEntry": 150.00, "targetExit": 175.00 }
   ],
   "convictions": [
-    { "ticker": "TICKER", "thesis": "1-2 sentence alpha thesis" }
+    { "ticker": "TICKER", "thesis": "specific alpha thesis with catalyst, timeline, and price target" }
   ],
-  "risk": "1-2 sentence risk warning"
+  "risk": "1-2 sentence specific risk warning with levels to watch"
 }
 
 Rules:
-- "holdings" MUST include ALL current positions.
+- "holdings" MUST include ALL current positions with a "signal" for each.
 - sells/buys SHOULD BE EMPTY most days. Only when there's a strong reason.
 - Every sell must have a corresponding buy of equal total (rebalance, not cash out).
 - Default is HOLD. Only ACT when it meaningfully improves alpha potential.
-- Reference actual price data. Think in weeks/months.`;
+- Reference actual price data. Think in weeks/months.
+- For buys: "targetEntry" = ideal buy price, "targetExit" = take-profit target. Be precise.`;
 
   // 5. Call Claude
   const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {

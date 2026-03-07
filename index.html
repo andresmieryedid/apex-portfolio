@@ -1504,6 +1504,7 @@ async function runAnalysis(auto = false) {
           </table>
         </div>` : ''}
 
+        ${needsAction ? `
         <div class="trades-section">
           <div class="trade-card sell">
             <div class="trade-card-header">Sell</div>
@@ -1513,7 +1514,11 @@ async function runAnalysis(auto = false) {
             <div class="trade-card-header">Buy</div>
             ${buysHtml}
           </div>
-        </div>
+        </div>` : `
+        <div style="background:rgba(0,229,160,0.05); border:1px solid rgba(0,229,160,0.15); border-radius:12px; padding:20px 24px; margin-top:16px;">
+          <div style="font-family:'Syne',sans-serif; font-weight:700; font-size:16px; color:var(--accent); margin-bottom:8px;">HOLD — No Trades Today</div>
+          <div style="font-size:12px; color:var(--muted); line-height:1.6;">All positions are performing as expected. Stay the course. The AI will alert you when action is needed.</div>
+        </div>`}
 
         ${convictionsHtml ? `
         <div class="convictions-card">

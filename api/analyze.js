@@ -9,13 +9,21 @@ export default async function handler(req, res) {
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  let pf;
-  try {
-    pf = JSON.parse(process.env.PORTFOLIO || 'null');
-  } catch (e) {
-    return res.status(500).json({ error: 'Portfolio config error', detail: e.message });
-  }
-  if (!pf) return res.status(400).json({ error: 'No portfolio configured' });
+  const pf = {
+    id: 'aggressive',
+    name: 'Aggressive Growth',
+    strategy: 'aggressive',
+    targetAlpha: 10,
+    startDate: '2026-03-09',
+    holdings: [
+      { ticker: 'MU', company: 'Micron Technology', amount: 850 },
+      { ticker: 'AVGO', company: 'Broadcom', amount: 850 },
+      { ticker: 'NBIS', company: 'Nebius Group', amount: 850 },
+      { ticker: 'AMZN', company: 'Amazon', amount: 850 },
+      { ticker: 'TTD', company: 'The Trade Desk', amount: 800 },
+      { ticker: 'PYPL', company: 'PayPal', amount: 800 },
+    ],
+  };
 
   try {
     const result = await runAnalysis(pf);

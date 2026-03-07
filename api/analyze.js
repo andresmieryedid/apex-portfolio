@@ -9,29 +9,194 @@ export default async function handler(req, res) {
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const pf = {
-    id: 'aggressive',
-    name: 'Aggressive Growth',
-    strategy: 'aggressive',
-    targetAlpha: 10,
-    startDate: '2026-03-09',
-    holdings: [
-      { ticker: 'MU', company: 'Micron Technology', amount: 850 },
-      { ticker: 'AVGO', company: 'Broadcom', amount: 850 },
-      { ticker: 'NBIS', company: 'Nebius Group', amount: 850 },
-      { ticker: 'AMZN', company: 'Amazon', amount: 850 },
-      { ticker: 'TTD', company: 'The Trade Desk', amount: 800 },
-      { ticker: 'PYPL', company: 'PayPal', amount: 800 },
-    ],
-  };
+  const pfId = 'aggressive';
+  const targetAlpha = 10;
+  const budget = 5000;
+  const startDate = '2026-03-09';
+
+  // Check if we already have a portfolio saved in KV
+  let savedPortfolio = await kv.get(`portfolio:${pfId}`);
 
   try {
-    const result = await runAnalysis(pf);
-    return res.status(200).json(result);
+    if (!savedPortfolio || savedPortfolio.length === 0) {
+      // First run: AI builds the portfolio from scratch
+      const result = await buildPortfolio({ pfId, targetAlpha, budget, startDate });
+      return res.status(200).json(result);
+    } else {
+      // Subsequent runs: AI analyzes existing portfolio
+      const pf = {
+        id: pfId,
+        name: 'Aggressive Growth',
+        strategy: 'aggressive',
+        targetAlpha,
+        startDate,
+        holdings: savedPortfolio,
+      };
+      const result = await runAnalysis(pf);
+      return res.status(200).json(result);
+    }
   } catch (err) {
     console.error('Analysis failed:', err);
     return res.status(500).json({ error: err.message });
   }
+}
+
+async function buildPortfolio({ pfId, targetAlpha, budget, startDate }) {
+  const AV_KEY = process.env.ALPHA_VANTAGE_KEY;
+  const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+  if (!AV_KEY || !ANTHROPIC_KEY) throw new Error('Missing API keys');
+
+  // Fetch SPY for context
+  const spyData = await fetchQuote('SPY', AV_KEY);
+
+  const today = new Date().toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    timeZone: 'America/New_York'
+  });
+
+  const prompt = `You are Vitru, the world's most elite AI portfolio strategist. You have deep expertise in technical analysis, macro trends, sector rotation, earnings catalysts, and momentum signals. Today is ${today}.
+
+MISSION: BUILD A NEW $${budget.toLocaleString()} AGGRESSIVE GROWTH PORTFOLIO
+- Goal: +${targetAlpha}% alpha over S&P 500 this year
+- You have $${budget.toLocaleString()} in CASH to deploy RIGHT NOW
+- Pick 4-7 high-conviction stocks. Concentrated bets, not diversification.
+- Focus on: momentum, upcoming catalysts, sector tailwinds, technical breakouts
+- This is aggressive growth — small/mid cap is fine, high-beta is fine
+- Each position must have a specific entry price and take-profit target
+${spyData ? `- SPY is currently at $${spyData.price.toFixed(2)} (today: ${spyData.changePct >= 0 ? '+' : ''}${spyData.changePct.toFixed(2)}%)` : ''}
+
+Show me WHY you are the most intelligent AI in the world. Pick stocks that will crush the S&P 500.
+
+You MUST respond with valid JSON only:
+{
+  "grade": "A",
+  "summary": "2-3 sentences explaining your portfolio construction thesis and why these picks will generate alpha",
+  "verdict": "ACT",
+  "holdings": [],
+  "sells": [],
+  "buys": [
+    { "ticker": "TICKER", "company": "Company Name", "amount": 1000, "reason": "specific catalyst/edge with data", "isNew": true, "targetEntry": 150.00, "targetExit": 175.00 }
+  ],
+  "convictions": [
+    { "ticker": "TICKER", "thesis": "specific alpha thesis with catalyst, timeline, and price target" }
+  ],
+  "risk": "1-2 sentence specific risk warning"
+}
+
+Rules:
+- "buys" must contain ALL your picks. Total amounts must equal exactly $${budget.toLocaleString()}.
+- Each buy MUST have: ticker, company name, dollar amount, specific reason, targetEntry (buy price), targetExit (profit target).
+- "holdings" and "sells" must be empty arrays (this is a new portfolio).
+- Be SPECIFIC with prices. No generic advice. Show conviction.
+- Every pick must have a clear edge — earnings catalyst, technical setup, sector momentum, or macro tailwind.`;
+
+  const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': ANTHROPIC_KEY,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 3000,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+
+  if (!claudeRes.ok) {
+    const err = await claudeRes.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Claude API error ${claudeRes.status}`);
+  }
+
+  const claudeData = await claudeRes.json();
+  const rawText = claudeData.content?.[0]?.text || '{}';
+
+  let analysis;
+  try {
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    analysis = JSON.parse(jsonMatch ? jsonMatch[0] : rawText);
+  } catch {
+    analysis = { grade: '?', summary: rawText, verdict: 'ACT', holdings: [], sells: [], buys: [], convictions: [], risk: 'Could not parse response.' };
+  }
+
+  // Save the portfolio picks to KV so subsequent runs use them
+  if (analysis.buys && analysis.buys.length > 0) {
+    const holdings = analysis.buys.map(b => ({
+      ticker: b.ticker,
+      company: b.company || b.ticker,
+      amount: b.amount,
+    }));
+    await kv.set(`portfolio:${pfId}`, holdings);
+
+    // Also save initial prices
+    const initPrices = {};
+    for (const b of analysis.buys) {
+      if (b.targetEntry) initPrices[b.ticker] = b.targetEntry;
+    }
+    initPrices['SPY'] = spyData?.price || 0;
+    await kv.set(`init:prices:${pfId}`, initPrices);
+  }
+
+  // Send email
+  const EMAILJS_SERVICE = process.env.EMAILJS_SERVICE_ID;
+  const EMAILJS_TEMPLATE = process.env.EMAILJS_TEMPLATE_ID;
+  const EMAILJS_PUBLIC_KEY = process.env.EMAILJS_PUBLIC_KEY;
+  const USER_EMAIL = process.env.USER_EMAIL;
+  let emailSent = false;
+
+  if (EMAILJS_SERVICE && EMAILJS_TEMPLATE && EMAILJS_PUBLIC_KEY && USER_EMAIL) {
+    const subject = `Vitru — NEW PORTFOLIO: Buy These Stocks Now`;
+    const message = `Vitru Portfolio Builder — ${today}
+Grade: ${analysis.grade}
+
+${analysis.summary}
+
+STOCKS TO BUY NOW:
+${(analysis.buys || []).map(b => `- ${b.ticker} (${b.company}): $${b.amount} — Entry: $${b.targetEntry} → Target: $${b.targetExit}\n  ${b.reason}`).join('\n\n')}
+
+${analysis.risk ? 'RISK: ' + analysis.risk : ''}
+---
+Generated by Vitru LLC`;
+
+    try {
+      await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service_id: EMAILJS_SERVICE,
+          template_id: EMAILJS_TEMPLATE,
+          user_id: EMAILJS_PUBLIC_KEY,
+          template_params: { to_email: USER_EMAIL, subject, message },
+        }),
+      });
+      emailSent = true;
+    } catch (e) {
+      console.error('Email failed:', e);
+    }
+  }
+
+  return {
+    portfolioId: pfId,
+    portfolioName: 'Aggressive Growth',
+    strategy: 'aggressive',
+    verdict: 'ACTION REQUIRED',
+    analysis,
+    marketData: spyData ? { SPY: spyData } : {},
+    spyData,
+    portfolioChangePct: 0,
+    alpha: 0,
+    ytdAlpha: 0,
+    ytdPortfolioReturn: 0,
+    ytdSpyReturn: 0,
+    targetAlpha,
+    alphaGap: targetAlpha,
+    tradingDaysLeft: 252,
+    onTrack: true,
+    startValue: budget,
+    emailSent,
+    timestamp: new Date().toISOString(),
+  };
 }
 
 async function runAnalysis(pf) {

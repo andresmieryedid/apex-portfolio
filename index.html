@@ -1146,6 +1146,7 @@ window.onload = () => {
 
   // Auto-load latest analysis from server
   loadLatestData();
+  startLiveFeed();
 };
 
 
@@ -1230,6 +1231,38 @@ function updateDashboard() {
     alphaEl.className = 'dash-value ' + (alpha >= 0 ? 'green' : 'red');
   }
 
+}
+
+// ─── Live Price Feed (Finnhub) ──────────────────────────────────────────────
+let priceInterval = null;
+
+async function refreshPrices() {
+  if (portfolio.length === 0) return;
+  const tickers = [...new Set(portfolio.map(s => s.ticker)), 'SPY'];
+  try {
+    const res = await fetch('/api/prices?symbols=' + tickers.join(','), {
+      headers: { 'Authorization': 'Bearer ' + authToken },
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.prices) {
+      if (data.prices.SPY) {
+        spyData = data.prices.SPY;
+        delete data.prices.SPY;
+      }
+      marketData = data.prices;
+      lastFetchTime = data.timestamp;
+      updateDashboard();
+    }
+  } catch (e) {
+    console.error('Price refresh failed:', e);
+  }
+}
+
+function startLiveFeed() {
+  if (priceInterval) clearInterval(priceInterval);
+  refreshPrices();
+  priceInterval = setInterval(refreshPrices, 30000); // every 30 seconds
 }
 
 // ─── Portfolio Render ─────────────────────────────────────────────────────────
@@ -1573,6 +1606,7 @@ async function doLogin() {
     renderPortfolio();
     addLog('Vitru initialized — signed in as ' + userRole, 'info');
     loadLatestData();
+    startLiveFeed();
   } catch (e) {
     errorEl.style.display = 'block';
   }

@@ -54,39 +54,52 @@ async function buildPortfolio({ pfId, targetAlpha, budget, startDate }) {
     timeZone: 'America/New_York'
   });
 
-  const prompt = `You are Vitru, the world's most elite AI portfolio strategist. You have deep expertise in technical analysis, macro trends, sector rotation, earnings catalysts, and momentum signals. Today is ${today}.
+  const prompt = `You are Vitru. You've been challenged:
 
-MISSION: BUILD A NEW $${budget.toLocaleString()} AGGRESSIVE GROWTH PORTFOLIO
-- Goal: +${targetAlpha}% alpha over S&P 500 this year
-- You have $${budget.toLocaleString()} in CASH to deploy RIGHT NOW
-- Pick 4-7 high-conviction stocks. Concentrated bets, not diversification.
-- Focus on: momentum, upcoming catalysts, sector tailwinds, technical breakouts
-- This is aggressive growth — small/mid cap is fine, high-beta is fine
-${spyData ? `- SPY is currently at $${spyData.price.toFixed(2)} (today: ${spyData.changePct >= 0 ? '+' : ''}${spyData.changePct.toFixed(2)}%)` : ''}
+"According to reports & the world, you're the smartest AI out there. So we're going to test your stock picking ability by giving you a brand new $5,000 investment account. Your goal is simple: outperform the SPY. You in?"
 
-IMPORTANT: Do NOT guess stock prices. I will look up the real prices after you pick. Just focus on picking the best tickers, the dollar allocation, and your reasoning.
+You're in. Today is ${today}. This is real money. Your reputation is on the line.
 
-You MUST respond with valid JSON only:
+THE CHALLENGE:
+- $${budget.toLocaleString()} starting capital. Deploy it ALL right now.
+- Beat the S&P 500 by +${targetAlpha}% or more this year.
+- You will be tracked DAILY against SPY. Every dollar, every percentage point.
+- At year end, the world sees if AI can actually pick stocks or if it's all talk.
+${spyData ? `\nMARKET CONTEXT:\n- SPY: $${spyData.price.toFixed(2)} (today: ${spyData.changePct >= 0 ? '+' : ''}${spyData.changePct.toFixed(2)}%)` : ''}
+
+YOUR EDGE:
+You have access to knowledge about every public company, every sector trend, every macro signal, every earnings calendar, every technical pattern. Use ALL of it. Think about:
+- What sectors have the strongest momentum RIGHT NOW in March 2026?
+- Which companies have upcoming catalysts (earnings, FDA approvals, product launches, contracts)?
+- Where is smart money flowing? What are institutions accumulating?
+- What technical setups are screaming "buy"?
+- What macro tailwinds (AI, defense, energy, rates) create asymmetric upside?
+
+CONSTRAINTS:
+- Pick 4-7 stocks. Concentrated high-conviction bets.
+- Aggressive growth — you can pick any market cap, any sector.
+- No ETFs, no bonds, no options. Individual stocks only.
+- Total allocation must equal exactly $${budget.toLocaleString()}.
+
+IMPORTANT: Do NOT guess stock prices. I will fetch real live prices after you pick. Focus purely on WHICH stocks and WHY.
+
+Respond with valid JSON only:
 {
   "grade": "A",
-  "summary": "2-3 sentences explaining your portfolio construction thesis and why these picks will generate alpha",
+  "summary": "Your opening statement — why this portfolio will beat SPY. Be bold. Be specific.",
   "verdict": "ACT",
   "holdings": [],
   "sells": [],
   "buys": [
-    { "ticker": "TICKER", "company": "Company Name", "amount": 1000, "reason": "specific catalyst/edge", "isNew": true }
+    { "ticker": "TICKER", "company": "Company Name", "amount": 1000, "reason": "The specific edge — what catalyst, what setup, what the market is missing", "isNew": true }
   ],
   "convictions": [
-    { "ticker": "TICKER", "thesis": "specific alpha thesis with catalyst, timeline, and why this will outperform" }
+    { "ticker": "TICKER", "thesis": "Your full conviction thesis — the catalyst, the timeline, and the expected magnitude of the move" }
   ],
-  "risk": "1-2 sentence specific risk warning"
+  "risk": "What could go wrong and what you're watching"
 }
 
-Rules:
-- "buys" must contain ALL your picks. Total amounts must equal exactly $${budget.toLocaleString()}.
-- Each buy MUST have: ticker, company name, dollar amount, specific reason.
-- "holdings" and "sells" must be empty arrays (this is a new portfolio).
-- Every pick must have a clear edge — earnings catalyst, technical setup, sector momentum, or macro tailwind.`;
+This is Day 1. Make it count.`;
 
   const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -97,7 +110,8 @@ Rules:
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 3000,
+      max_tokens: 4000,
+      temperature: 1,
       messages: [{ role: 'user', content: prompt }],
     }),
   });

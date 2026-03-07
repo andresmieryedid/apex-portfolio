@@ -973,15 +973,14 @@
     </div>
   </div>
 
-  <!-- Portfolio -->
-  <div class="portfolio-card">
+  <!-- Portfolio (hidden until AI picks stocks) -->
+  <div class="portfolio-card" id="portfolioSection" style="display:none;">
     <div class="portfolio-header">
       <div>
         <div class="section-label">Portfolio</div>
         <h2>Your Holdings</h2>
       </div>
       <div style="display:flex; gap:10px; align-items:center;">
-        <button class="btn btn-secondary" onclick="fetchMarketData()" style="padding:6px 12px; font-size:11px;">Refresh Prices</button>
         <div class="total-badge" id="totalBadge">$5,000.00 invested</div>
       </div>
     </div>
@@ -995,7 +994,6 @@
           <th>Price</th>
           <th>Today</th>
           <th>Allocation</th>
-          <th></th>
         </tr>
       </thead>
       <tbody id="portfolioBody"></tbody>

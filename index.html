@@ -1342,7 +1342,7 @@ function savePortfolio() {
 
 // ─── AI Analysis ─────────────────────────────────────────────────────────────
 async function runAnalysis(auto = false) {
-  if (portfolio.length === 0) { showToast('Add stocks to your portfolio first', 'error'); return; }
+  // Allow running with empty portfolio — AI will pick stocks on first run
 
   const btn = document.getElementById('runBtn');
   btn.disabled = true;

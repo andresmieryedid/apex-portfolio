@@ -973,32 +973,54 @@
     </div>
   </div>
 
-  <!-- Portfolio (hidden until AI picks stocks) -->
-  <div class="portfolio-card" id="portfolioSection" style="display:none;">
+  <!-- Portfolio Holdings -->
+  <div class="portfolio-card" id="portfolioSection">
     <div class="portfolio-header">
       <div>
         <div class="section-label">Portfolio</div>
         <h2>Your Holdings</h2>
       </div>
       <div style="display:flex; gap:10px; align-items:center;">
-        <div class="total-badge" id="totalBadge">$5,000.00 invested</div>
+        <div class="total-badge" id="totalBadge">$0.00 invested</div>
       </div>
     </div>
 
-    <table id="portfolioTable">
+    <div id="emptyPortfolio" style="text-align:center; padding:30px 0; color:var(--muted);">
+      Waiting for Monday — AI will pick your stocks. Then input what you bought below.
+    </div>
+
+    <table id="portfolioTable" style="display:none;">
       <thead>
         <tr>
           <th>Ticker</th>
-          <th>Company</th>
+          <th>Shares</th>
+          <th>Avg Price</th>
           <th>Invested</th>
-          <th>Price</th>
-          <th>Today</th>
           <th>Allocation</th>
+          <th></th>
         </tr>
       </thead>
       <tbody id="portfolioBody"></tbody>
     </table>
 
+    <!-- Add Holding Form -->
+    <div id="addHoldingForm" style="border-top:1px solid var(--border); padding:16px 0 8px; margin-top:12px;">
+      <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+        <div>
+          <label style="font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;">Ticker</label>
+          <input id="addTicker" type="text" placeholder="AAPL" style="display:block; width:80px; background:var(--surface2); border:1px solid var(--border); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px; padding:6px 8px; border-radius:6px; margin-top:4px; text-transform:uppercase;" />
+        </div>
+        <div>
+          <label style="font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;">Shares</label>
+          <input id="addShares" type="number" placeholder="10" step="0.01" style="display:block; width:80px; background:var(--surface2); border:1px solid var(--border); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px; padding:6px 8px; border-radius:6px; margin-top:4px;" />
+        </div>
+        <div>
+          <label style="font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;">Price Bought At</label>
+          <input id="addPrice" type="number" placeholder="150.00" step="0.01" style="display:block; width:110px; background:var(--surface2); border:1px solid var(--border); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px; padding:6px 8px; border-radius:6px; margin-top:4px;" />
+        </div>
+        <button class="btn btn-primary" onclick="addHolding()" style="padding:6px 16px; font-size:11px; height:33px;">Add</button>
+      </div>
+    </div>
   </div>
 
   <!-- Action bar -->
@@ -1215,60 +1237,85 @@ function renderPortfolio() {
   const total = portfolio.reduce((s, x) => s + x.amount, 0);
   document.getElementById('totalBadge').textContent = `$${total.toLocaleString('en-US', {minimumFractionDigits:2})} invested`;
 
+  const table = document.getElementById('portfolioTable');
+  const empty = document.getElementById('emptyPortfolio');
   const tbody = document.getElementById('portfolioBody');
   tbody.innerHTML = '';
 
+  if (portfolio.length === 0) {
+    table.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+
+  table.style.display = '';
+  empty.style.display = 'none';
+
   portfolio.forEach((stock, i) => {
     const pct = total > 0 ? ((stock.amount / total) * 100).toFixed(1) : 0;
-    const quote = marketData[stock.ticker];
-
-    let priceCell = '<span style="color:var(--muted)">--</span>';
-    let changeCell = '<span style="color:var(--muted)">--</span>';
-
-    if (quote) {
-      priceCell = `$${quote.price.toFixed(2)}`;
-      const cls = quote.changePct > 0 ? 'up' : quote.changePct < 0 ? 'down' : 'flat';
-      const sign = quote.changePct >= 0 ? '+' : '';
-      changeCell = `<span class="price-change ${cls}">${sign}${quote.changePct.toFixed(2)}%</span>`;
-    }
-
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><span class="ticker-badge">${stock.ticker}</span></td>
-      <td>
-        <input class="inline-input" value="${stock.company}"
-          onchange="updateStock(${i}, 'company', this.value)" style="width:140px;" />
-      </td>
-      <td>
-        <input class="inline-input" type="number" value="${stock.amount}"
-          onchange="updateStock(${i}, 'amount', parseFloat(this.value))" />
-      </td>
-      <td>${priceCell}</td>
-      <td>${changeCell}</td>
+      <td>${stock.shares || '--'}</td>
+      <td>$${(stock.avgPrice || 0).toFixed(2)}</td>
+      <td>$${(stock.amount || 0).toLocaleString('en-US', {minimumFractionDigits:2})}</td>
       <td>
         <div class="allocation-bar">
           <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
           <span class="alloc-pct">${pct}%</span>
         </div>
       </td>
-      <td><button class="remove-btn" onclick="removeStock(${i})">&#10005;</button></td>
+      <td><button class="remove-btn" onclick="removeHolding(${i})">&#10005;</button></td>
     `;
     tbody.appendChild(tr);
   });
+}
+
+function addHolding() {
+  const ticker = document.getElementById('addTicker').value.trim().toUpperCase();
+  const shares = parseFloat(document.getElementById('addShares').value);
+  const price = parseFloat(document.getElementById('addPrice').value);
+
+  if (!ticker || !shares || !price) {
+    showToast('Fill in all fields');
+    return;
+  }
+
+  const amount = parseFloat((shares * price).toFixed(2));
+  portfolio.push({ ticker, shares, avgPrice: price, amount });
   savePortfolio();
-}
-
-function updateStock(i, key, val) {
-  portfolio[i][key] = val;
   renderPortfolio();
   updateDashboard();
+  saveHoldingsToServer();
+
+  // Clear form
+  document.getElementById('addTicker').value = '';
+  document.getElementById('addShares').value = '';
+  document.getElementById('addPrice').value = '';
+
+  addLog(`Added ${shares} shares of ${ticker} @ $${price.toFixed(2)}`, 'info');
 }
 
-function removeStock(i) {
+function removeHolding(i) {
+  const removed = portfolio[i];
   portfolio.splice(i, 1);
+  savePortfolio();
   renderPortfolio();
   updateDashboard();
-  addLog('Stock removed from portfolio', 'info');
+  saveHoldingsToServer();
+  addLog(`Removed ${removed.ticker} from portfolio`, 'info');
+}
+
+async function saveHoldingsToServer() {
+  try {
+    await fetch('/api/holdings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+      body: JSON.stringify({ holdings: portfolio }),
+    });
+  } catch (e) {
+    console.error('Failed to save holdings:', e);
+  }
 }
 
 function addStock() {
@@ -1566,29 +1613,23 @@ function switchPortfolio(id) {
 
 async function loadLatestData() {
   try {
+    // Load saved holdings from server
+    const hRes = await fetch('/api/holdings', {
+      headers: { 'Authorization': 'Bearer ' + authToken },
+    });
+    if (hRes.ok) {
+      const hData = await hRes.json();
+      if (hData.holdings && hData.holdings.length > 0) {
+        portfolio = hData.holdings;
+        renderPortfolio();
+      }
+    }
+
     const res = await fetch('/api/history?id=' + currentPortfolioId, {
       headers: { 'Authorization': 'Bearer ' + authToken },
     });
     if (!res.ok) return;
     const data = await res.json();
-
-    // Populate portfolio selector (filtered by user access)
-    if (data.portfolioList && data.portfolioList.length > 0) {
-      portfolioList = data.portfolioList;
-      const sel = document.getElementById('portfolioSelector');
-      if (sel.options.length === 0) {
-        const accessible = userPortfolios.length > 0
-          ? data.portfolioList.filter(p => userPortfolios.includes(p.id))
-          : data.portfolioList;
-        accessible.forEach(p => {
-          const opt = document.createElement('option');
-          opt.value = p.id;
-          opt.textContent = `${p.name} (+${p.targetAlpha}% alpha)`;
-          sel.appendChild(opt);
-        });
-        sel.value = currentPortfolioId;
-      }
-    }
 
     if (data.ytdStats) {
       updateAlphaTracker({
